@@ -1,0 +1,35 @@
+# ===== 공통 / IDE =====
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# ===== 환경변수 / 민감정보 =====
+.env
+.env.*
+*.pem
+application-secret.yml
+application-local.yml
+
+# ===== Backend (Spring Boot / Gradle·Maven) =====
+backend/build/
+backend/target/
+backend/.gradle/
+backend/out/
+!backend/gradle/wrapper/gradle-wrapper.jar
+
+# ===== Frontend (React / Vite) =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# ===== AI Server (FastAPI / PyTorch) =====
+ai-server/__pycache__/
+ai-server/**/__pycache__/
+ai-server/venv/
+ai-server/.venv/
+*.pyc
+*.pt
+*.pth
+*.onnx
