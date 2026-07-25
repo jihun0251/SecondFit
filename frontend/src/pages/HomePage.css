@@ -1,0 +1,218 @@
+.home {
+  min-height: 100vh;
+}
+
+/* 콘텐츠 영역 */
+.home-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* 히어로 배너 */
+.home-hero {
+  background: linear-gradient(135deg, #1f2937, #111827);
+  border-radius: 16px;
+  padding: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
+}
+
+.home-hero-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #9ca3af;
+  margin-bottom: 12px;
+}
+
+.home-hero-title {
+  font-size: 30px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color:#ffffff
+}
+
+.home-hero-desc {
+  font-size: 15px;
+  color: #d1d5db;
+  margin: 0;
+}
+
+.home-hero-image {
+  width: 150px;
+  height: 110px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+/* 카테고리 칩 */
+.category-chips {
+  display: flex;
+  gap: 10px;
+  margin: 28px 0 24px;
+  flex-wrap: wrap;
+}
+
+.category-chip {
+  padding: 9px 18px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+
+.category-chip:hover {
+  border-color: #111827;
+}
+
+.category-chip.active {
+  background-color: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+/* 섹션 헤더 */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.section-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  color: #111827;
+}
+
+.section-desc {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.section-more {
+  font-size: 14px;
+  color: #4f6ef7;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* 상품 그리드 */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+}
+
+.product-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #f3f4f6;
+  text-decoration: none;
+  transition: box-shadow 0.2s;
+}
+
+.product-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.product-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background-color: #e5e7eb;
+}
+
+.product-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background-color: #dcfce7;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.product-info {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-name {
+  font-size: 15px;
+  color: #111827;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.product-price {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* 스켈레톤 (내용 없는 카드) */
+.skeleton-line {
+  height: 12px;
+  background-color: #e5e7eb;
+  border-radius: 4px;
+}
+
+.skeleton-line.short {
+  width: 50%;
+}
+
+.skeleton-line.long {
+  width: 75%;
+}
+
+@media (max-width: 1024px) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .home-hero-image {
+    display: none;
+  }
+}
+
+.product-like {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #374151;
+}
+
+.product-like.liked {
+  color: #ef4444;
+}

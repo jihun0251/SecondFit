@@ -1,0 +1,182 @@
+.detail-body {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  display: flex;
+  gap: 40px;
+}
+
+/* 없는 상품 */
+.detail-notfound {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 120px 24px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.btn-back {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 12px 24px;
+  background-color: #111827;
+  color: #ffffff;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 이미지 */
+.detail-images {
+  width: 460px;
+  flex-shrink: 0;
+}
+
+.detail-main-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background-color: #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.detail-thumbs {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.detail-thumb {
+  width: 80px;
+  height: 70px;
+  background-color: #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* 정보 */
+.detail-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detail-top .badge-onsale {
+  position: static;
+  background-color: #dcfce7;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 12px;
+}
+
+.detail-category {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.detail-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px 0;
+}
+
+.detail-price {
+  font-size: 30px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 28px 0;
+}
+
+.detail-spec {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 28px;
+}
+
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.spec-label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.spec-value {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 500;
+}
+
+.detail-desc-title {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 14px 0;
+  font-weight: 500;
+}
+
+.detail-desc-text {
+  font-size: 15px;
+  color: #374151;
+  line-height: 1.7;
+  margin: 0 0 40px 0;
+}
+
+/* 하단 버튼 */
+.detail-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: auto;
+}
+
+.btn-like {
+  padding: 16px 32px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.btn-buy {
+  flex: 1;
+  padding: 16px;
+  background-color: #111827;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-buy:hover {
+  background-color: #374151;
+}
+
+.btn-like.liked {
+  border-color: #ef4444;
+  color: #ef4444;
+}

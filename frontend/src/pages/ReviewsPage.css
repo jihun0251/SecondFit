@@ -1,0 +1,113 @@
+.mypage-body {
+  display: flex;
+}
+
+.mypage-main {
+  flex: 1;
+  padding: 32px 40px;
+}
+
+.mypage-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 24px 0;
+}
+
+/* 별점 공통 */
+.stars {
+  display: inline-flex;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.star-on {
+  color: #f59e0b;
+}
+
+.star-off {
+  color: #e5e7eb;
+}
+
+/* 평점 요약 */
+.review-summary {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 20px;
+}
+
+.review-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-number {
+  font-size: 40px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.review-summary-desc {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* 리뷰 리스트 */
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.review-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 22px 24px;
+}
+
+.review-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.reviewer-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reviewer-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #e5e7eb;
+}
+
+.reviewer-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.review-product {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.review-content {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0;
+}

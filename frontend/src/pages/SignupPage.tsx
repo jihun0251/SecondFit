@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./SignupPage.css";
+import { Link } from "react-router-dom";
 
 function SignupPage() {
   const [email, setEmail] = useState("");
@@ -69,6 +70,11 @@ function SignupPage() {
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
           />
+        </div>
+
+        <div className="signup-links">
+          <span>이미 계정이 있으신가요? </span>
+          <Link to="/login">로그인</Link>
         </div>
 
         <div className="signup-field">
