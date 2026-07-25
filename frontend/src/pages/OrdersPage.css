@@ -1,0 +1,102 @@
+.order-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 22px 0 24px;
+}
+
+.order-tab {
+  padding: 10px 18px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #374151;
+}
+
+.order-tab.active {
+  background-color: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.order-row {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.order-row-thumb {
+  width: 68px;
+  height: 62px;
+  background-color: #e5e7eb;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.order-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.order-row-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.order-row-meta {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.order-status {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 14px;
+}
+
+.st-shipping {
+  background-color: #ede9fe;
+  color: #7c3aed;
+}
+
+.st-delivered {
+  background-color: #ccfbf1;
+  color: #0d9488;
+}
+
+.st-confirmed {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.order-action {
+  padding: 12px 22px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: #374151;
+}
+
+.order-action.primary {
+  background-color: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}

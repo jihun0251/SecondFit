@@ -1,0 +1,118 @@
+.address-body {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 24px 60px;
+}
+
+.address-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.address-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.badge-paid {
+  background-color: #eef2ff;
+  color: #4f6ef7;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 14px;
+}
+
+.address-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 28px;
+}
+
+.addr-field {
+  margin-bottom: 22px;
+}
+
+.addr-field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.addr-field input,
+.addr-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  color: #374151;
+  background-color: #ffffff;
+}
+
+.addr-field input:focus,
+.addr-field select:focus {
+  border-color: #111827;
+}
+
+.addr-mt {
+  margin-top: 12px;
+}
+
+.addr-zip-row {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-zip {
+  padding: 14px 24px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  color: #374151;
+}
+
+.address-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.btn-prev {
+  padding: 16px 32px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 15px;
+  cursor: pointer;
+  color: #374151;
+}
+
+.btn-next {
+  flex: 1;
+  padding: 16px;
+  background-color: #4f6ef7;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-next:hover {
+  background-color: #4058d8;
+}
