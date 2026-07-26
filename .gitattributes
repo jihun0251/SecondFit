@@ -1,0 +1,18 @@
+# 저장소 안에서는 항상 LF로 저장한다 (OS 섞여도 diff 안 터지게)
+* text=auto eol=lf
+
+# 실행 스크립트 / 배치파일은 예외
+*.bat        text eol=crlf
+*.cmd        text eol=crlf
+gradlew      text eol=lf
+
+# 바이너리 (줄바꿈 변환 금지)
+*.jar  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pt   binary
+*.pth  binary
+*.onnx binary
