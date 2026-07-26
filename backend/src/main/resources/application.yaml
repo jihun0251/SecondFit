@@ -9,6 +9,24 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+    open-in-view: false          # 트랜잭션 밖(뷰 렌더링 시점)에서 지연로딩 되는 걸 막음
     properties:
       hibernate:
         format_sql: true
+        default_batch_fetch_size: 100   # 지연로딩 N+1 → IN 절 한 방으로 묶어줌
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+# --- 커스텀 설정 ---
+jwt:
+  # HS256용 시크릿. 반드시 32바이트(256bit) 이상. 운영에선 환경변수 JWT_SECRET으로 주입할 것.
+  secret: ${JWT_SECRET:secondfit-local-dev-secret-key-please-change-me-0123456789}
+  access-token-validity-ms: 3600000       # 1시간
+  refresh-token-validity-ms: 1209600000   # 14일
+
+file:
+  # 상품 이미지 저장 위치 (로컬 디스크). 운영에선 S3로 교체.
+  upload-dir: ${FILE_UPLOAD_DIR:./uploads}

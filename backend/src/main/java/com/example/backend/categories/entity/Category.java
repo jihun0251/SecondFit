@@ -30,6 +30,8 @@ public class Category {
     private Category parent;
 
     // 자식 방향: 나는 여러 자식을 가진다 ([데님 자켓, 코트])
+    // @OrderBy가 없으면 자식들의 순서가 DB 반환 순서에 맡겨져 화면 순서가 들쭉날쭉해진다
     @OneToMany(mappedBy = "parent")
+    @OrderBy("sortOrder ASC, id ASC")
     private List<Category> children = new ArrayList<>();
 }
