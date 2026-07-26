@@ -16,7 +16,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "products")
+@Table(
+        name = "products",
+        // DDL의 인덱스와 1:1로 맞춘다. 인덱스가 없으면 목록 조회가 풀스캔으로 떨어진다.
+        indexes = {
+                @Index(name = "idx_products_seller", columnList = "seller_id"),
+                @Index(name = "idx_products_category", columnList = "category_id"),
+                @Index(name = "idx_products_status", columnList = "status"),
+                @Index(name = "idx_products_created", columnList = "created_at")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product {

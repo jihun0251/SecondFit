@@ -30,6 +30,8 @@ import java.util.List;
 public class ProductService {
 
     private static final int MAX_IMAGES = 8;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
@@ -89,12 +91,17 @@ public class ProductService {
     public PageResponse<ProductSummaryResponse> search(ProductSearchCondition condition) {
         Pageable pageable = PageRequest.of(
                 Math.max(condition.getPage(), 0),
-                condition.getPageSize() <= 0 ? 20 : Math.min(condition.getPageSize(), 100),
+                normalizeSize(condition.getPageSize()),
                 toSort(condition.getSort())
         );
 
         Page<Product> page = productRepository.findAll(ProductSpecification.search(condition), pageable);
         return PageResponse.of(page, ProductSummaryResponse::from);
+    }
+
+    private int normalizeSize(int size) {
+        if (size <= 0) return DEFAULT_PAGE_SIZE;
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     private Sort toSort(String sort) {
@@ -120,20 +127,29 @@ public class ProductService {
         return ProductDetailResponse.from(product);
     }
 
-    /** 내가 등록한 상품 목록 (판매 관리 화면) */
-    public PageResponse<ProductSummaryResponse> getMyProducts(Long sellerId, int page, int pageSize) {
+    /**
+     * 내 판매 내역 (GET /products/me).
+     * status가 있으면 해당 상태만, 없으면 전체.
+     */
+    public PageResponse<ProductSummaryResponse> getMyProducts(Long sellerId, Product.Status status,
+                                                              int page, int size) {
         Pageable pageable = PageRequest.of(
                 Math.max(page, 0),
-                pageSize <= 0 ? 20 : Math.min(pageSize, 100),
+                normalizeSize(size),
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
-        return PageResponse.of(productRepository.findBySellerId(sellerId, pageable), ProductSummaryResponse::from);
+
+        Page<Product> result = (status == null)
+                ? productRepository.findBySellerId(sellerId, pageable)
+                : productRepository.findBySellerIdAndStatus(sellerId, status, pageable);
+
+        return PageResponse.of(result, ProductSummaryResponse::from);
     }
 
     // ===================== 수정 / 삭제 =====================
 
     @Transactional
-    public void update(Long userId, Long productId, ProductUpdateRequest request) {
+    public ProductUpdateResponse update(Long userId, Long productId, ProductUpdateRequest request) {
         Product product = findOwnedProduct(userId, productId);
 
         if (!product.isEditable()) {
@@ -148,6 +164,8 @@ public class ProductService {
 
         product.update(category, request.getTitle(), request.getDescription(), request.getPrice(),
                 request.getSize(), request.getColor(), request.getConditionGrade());
+
+        return ProductUpdateResponse.from(product);
     }
 
     @Transactional
@@ -163,32 +181,43 @@ public class ProductService {
 
     // ===================== 이미지 =====================
 
-    /** 파일 업로드 → 저장 → 상품에 이미지 추가 */
+    /**
+     * 이미지 1장 업로드 → 저장 → 상품에 추가.
+     * 명세서상 Form 필드는 file(단수) + isThumbnail(선택).
+     */
     @Transactional
-    public ProductDetailResponse addImages(Long userId, Long productId, List<MultipartFile> files) {
+    public ProductImageUploadResponse addImage(Long userId, Long productId,
+                                               MultipartFile file, boolean isThumbnail) {
         Product product = findOwnedProduct(userId, productId);
 
         if (!product.isEditable()) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_EDITABLE);
         }
-        if (files == null || files.isEmpty()) {
-            throw new BusinessException(ErrorCode.PRODUCT_IMAGE_REQUIRED);
-        }
-        if (product.getImages().size() + files.size() > MAX_IMAGES) {
+        if (product.getImages().size() >= MAX_IMAGES) {
             throw new BusinessException(ErrorCode.PRODUCT_IMAGE_LIMIT_EXCEEDED);
         }
 
-        int nextOrder = product.getImages().size();
-        for (MultipartFile file : files) {
-            String url = fileStorageService.store(file);
-            product.addImage(ProductImage.builder()
-                    .imageUrl(url)
-                    .thumbnail(product.getImages().isEmpty()) // 첫 이미지면 자동으로 대표
-                    .sortOrder(nextOrder++)
-                    .build());
+        String url = fileStorageService.store(file);
+
+        // 첫 이미지는 무조건 대표. 그 외에는 요청값을 따른다.
+        boolean makeThumbnail = product.getImages().isEmpty() || isThumbnail;
+
+        // 새 이미지를 대표로 지정하면 기존 대표는 해제해야 한다 (대표는 항상 1장)
+        if (makeThumbnail) {
+            product.getImages().forEach(img -> img.markAsThumbnail(false));
         }
 
-        return ProductDetailResponse.from(product);
+        ProductImage image = ProductImage.builder()
+                .imageUrl(url)
+                .thumbnail(makeThumbnail)
+                .sortOrder(product.getImages().size())
+                .build();
+        product.addImage(image);
+
+        // flush를 해야 INSERT가 실행되어 image.id가 채워진다 (응답에 imageId가 필요)
+        productRepository.flush();
+
+        return ProductImageUploadResponse.from(image);
     }
 
     @Transactional

@@ -14,6 +14,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
      * Specification으로 자바에서 조건을 조립하는 쪽이 훨씬 읽기 쉽다.
      */
 
-    /** 내가 등록한 상품 목록 (판매자 마이페이지) */
+    /** 내가 등록한 상품 전체 (판매자 마이페이지) */
     Page<Product> findBySellerId(Long sellerId, Pageable pageable);
+
+    /** 내가 등록한 상품 중 특정 상태만 (GET /products/me?status=ON_SALE) */
+    Page<Product> findBySellerIdAndStatus(Long sellerId, Product.Status status, Pageable pageable);
 }

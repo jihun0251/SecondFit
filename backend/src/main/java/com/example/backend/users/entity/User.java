@@ -11,7 +11,14 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        // DDL: uk_users_email, uk_users_nickname — 제약조건 이름까지 맞춰둔다
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_users_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_users_nickname", columnNames = "nickname")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA는 기본 생성자 필요, 외부 무분별 생성은 막음
 public class User {

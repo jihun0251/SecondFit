@@ -9,7 +9,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "categories")
+@Table(
+        name = "categories",
+        // DDL: UNIQUE KEY uk_categories_name (name), KEY idx_categories_parent (parent_id)
+        uniqueConstraints = @UniqueConstraint(name = "uk_categories_name", columnNames = "name"),
+        indexes = @Index(name = "idx_categories_parent", columnList = "parent_id")
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Category {

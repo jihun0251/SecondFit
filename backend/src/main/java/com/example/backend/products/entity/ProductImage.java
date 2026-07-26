@@ -10,7 +10,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "product_images")
+@Table(
+        name = "product_images",
+        indexes = @Index(name = "idx_product_images_product", columnList = "product_id")
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductImage {

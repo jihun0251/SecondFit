@@ -4,6 +4,7 @@ import com.example.backend.auth.security.UserPrincipal;
 import com.example.backend.global.common.ApiResponse;
 import com.example.backend.global.common.PageResponse;
 import com.example.backend.products.dto.*;
+import com.example.backend.products.entity.Product;
 import com.example.backend.products.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +14,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -22,7 +21,7 @@ public class ProductController {
 
     private final ProductService productService;
 
-    /** 상품 등록 — 등록 즉시 PENDING_INBOUND(입고 대기) */
+    /** 상품 등록 — 등록 즉시 PENDING_INBOUND(입고 대기). 201 Created */
     @PostMapping
     public ResponseEntity<ApiResponse<ProductCreateResponse>> create(
             @AuthenticationPrincipal UserPrincipal principal,
@@ -44,17 +43,19 @@ public class ProductController {
     }
 
     /**
-     * 내가 등록한 상품 목록.
+     * 내 판매 내역 조회.
      * ⚠️ 아래 /{productId} 매핑보다 위에 있어야 "me"가 productId로 해석되지 않는다.
+     * ⚠️ 페이지 크기 파라미터가 목록 API는 pageSize, 여기는 size다 (명세서 기준).
      */
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<PageResponse<ProductSummaryResponse>>> getMyProducts(
             @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) Product.Status status,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize) {
+            @RequestParam(defaultValue = "20") int size) {
 
         return ResponseEntity.ok(ApiResponse.success(
-                productService.getMyProducts(principal.getUserId(), page, pageSize)));
+                productService.getMyProducts(principal.getUserId(), status, page, size)));
     }
 
     /** 상품 상세 조회 (조회수 +1). 인증 불필요 */
@@ -63,49 +64,54 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(productService.getDetail(productId)));
     }
 
-    /** 상품 수정 — 본인 + 입고 확인 전(PENDING_INBOUND)에만 가능 */
+    /** 상품 수정 — 본인 + 입고 확인 전(PENDING_INBOUND)에만 가능. 수정된 상품 반환 */
     @PatchMapping("/{productId}")
-    public ResponseEntity<ApiResponse<Void>> update(
+    public ResponseEntity<ApiResponse<ProductUpdateResponse>> update(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long productId,
             @Valid @RequestBody ProductUpdateRequest request) {
 
-        productService.update(principal.getUserId(), productId, request);
-        return ResponseEntity.ok(ApiResponse.success());
+        ProductUpdateResponse response = productService.update(principal.getUserId(), productId, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    /** 상품 삭제 — 본인 + 입고 확인 전에만 가능 */
+    /**
+     * 상품 삭제 — 본인 + 입고 확인 전에만 가능.
+     * 명세서상 204 No Content(본문 없음)라서 ApiResponse로 감싸지 않는다.
+     */
     @DeleteMapping("/{productId}")
-    public ResponseEntity<ApiResponse<Void>> delete(
+    public ResponseEntity<Void> delete(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long productId) {
 
         productService.delete(principal.getUserId(), productId);
-        return ResponseEntity.ok(ApiResponse.success());
+        return ResponseEntity.noContent().build();
     }
 
     /**
      * 상품 이미지 업로드 (multipart/form-data).
-     * 폼 필드명은 files, 여러 장 동시 업로드 가능.
+     * Form 필드: file(필수), isThumbnail(선택). 201 Created.
      */
     @PostMapping(value = "/{productId}/images", consumes = "multipart/form-data")
-    public ResponseEntity<ApiResponse<ProductDetailResponse>> addImages(
+    public ResponseEntity<ApiResponse<ProductImageUploadResponse>> addImage(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long productId,
-            @RequestPart("files") List<MultipartFile> files) {
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "isThumbnail", defaultValue = "false") boolean isThumbnail) {
 
-        ProductDetailResponse response = productService.addImages(principal.getUserId(), productId, files);
+        ProductImageUploadResponse response =
+                productService.addImage(principal.getUserId(), productId, file, isThumbnail);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
-    /** 상품 이미지 삭제 — 마지막 1장은 삭제 불가 */
+    /** 상품 이미지 삭제 — 마지막 1장은 삭제 불가. 204 No Content */
     @DeleteMapping("/{productId}/images/{imageId}")
-    public ResponseEntity<ApiResponse<Void>> deleteImage(
+    public ResponseEntity<Void> deleteImage(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long productId,
             @PathVariable Long imageId) {
 
         productService.deleteImage(principal.getUserId(), productId, imageId);
-        return ResponseEntity.ok(ApiResponse.success());
+        return ResponseEntity.noContent().build();
     }
 }
