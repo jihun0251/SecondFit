@@ -4,8 +4,14 @@
 --  IntelliJ Database 탭 → secondfit@localhost → 쿼리 콘솔에서
 --  전체 선택 후 실행(Ctrl+Enter)하면 됩니다.
 --
---  ⚠️ 판매자 계정(min@email.com)이 먼저 가입되어 있어야 합니다.
---  ⚠️ 여러 번 실행하면 상품이 중복 생성됩니다. 맨 아래 정리 쿼리를 먼저 돌리세요.
+--  ⚠️ 실행 전 확인할 것
+--   1) 백엔드를 한 번 실행해서 테이블/컬럼이 만들어져 있어야 합니다.
+--      (ddl-auto: update 가 inbounds, orders, wishlists 등 새 테이블과
+--       products.suspended 같은 새 컬럼을 자동으로 만들어 줍니다)
+--   2) 그 다음 IntelliJ Database 탭에서 secondfit 우클릭 → 새로고침(Ctrl+F5)
+--      해야 IDE가 새 컬럼을 인식합니다. 안 하면 '열 suspended 해결 불가'로 빨갛게 뜹니다.
+--   3) 판매자 계정(min@email.com)이 가입되어 있어야 합니다.
+--   4) 여러 번 실행하면 상품이 중복 생성됩니다. 맨 아래 정리 쿼리를 먼저 돌리세요.
 -- =========================================================
 
 -- ---------------------------------------------------------
@@ -117,13 +123,20 @@ WHERE p.description LIKE '[SEED]%'
 -- ---------------------------------------------------------
 -- 6. 확인
 -- ---------------------------------------------------------
-SELECT p.id, p.title, p.price, p.`size`, p.condition_grade, p.status,
-       c.name AS category, COUNT(i.id) AS image_count
+-- 이미지 개수는 GROUP BY 대신 스칼라 서브쿼리로 센다.
+-- JOIN + GROUP BY를 쓰면 MySQL의 ONLY_FULL_GROUP_BY 모드에서
+-- "ORDER BY에 쓴 created_at도 GROUP BY에 넣으라"는 에러가 난다.
+SELECT p.id,
+       p.title,
+       p.price,
+       p.`size`,
+       p.condition_grade,
+       p.status,
+       c.name AS category,
+       (SELECT COUNT(*) FROM product_images i WHERE i.product_id = p.id) AS image_count
 FROM products p
 LEFT JOIN categories c ON c.id = p.category_id
-LEFT JOIN product_images i ON i.product_id = p.id
 WHERE p.description LIKE '[SEED]%'
-GROUP BY p.id
 ORDER BY p.created_at DESC;
 
 
