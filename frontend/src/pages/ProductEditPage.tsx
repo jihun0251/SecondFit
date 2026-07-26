@@ -1,47 +1,100 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../components/Header";
-import { mockProducts, mockProfile } from "../mocks/data";
+import { categoryApi, productApi } from "../api";
+import { resolveImageUrl } from "../api/client";
+import { CONDITION_LABEL } from "../api/types";
+import type { ConditionGrade } from "../api/types";
+import { useAction, useAsync } from "../hooks/useAsync";
 import "./ProductCreatePage.css";
 
-const categories = ["아우터", "상의", "하의", "신발", "가방", "악세서리"];
 const sizes = ["S", "M", "L", "XL"];
-const grades = [
-  { label: "S (새상품급)", value: "NEW" },
-  { label: "A (사용감 적음)", value: "LIKE_NEW" },
-  { label: "B (사용감 있음)", value: "GOOD" },
-];
+const grades: ConditionGrade[] = ["NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"];
 
 function ProductEditPage() {
   const { productId } = useParams();
+  const id = Number(productId);
   const navigate = useNavigate();
 
-  // 기존 상품 정보 불러오기 (없으면 첫 상품으로 대체)
-  const original =
-    mockProducts.find((p) => p.id === Number(productId)) || mockProducts[0];
+  const { data: product, loading, error } = useAsync(() => productApi.getDetail(id), [id]);
+  const { data: categories } = useAsync(() => categoryApi.getTree(), []);
+  const { run, running } = useAction();
 
-  const [title, setTitle] = useState(original.name);
-  const [category, setCategory] = useState(original.category);
-  const [size, setSize] = useState(original.size);
-  const [color, setColor] = useState(original.color);
-  const [grade, setGrade] = useState("LIKE_NEW");
-  const [price, setPrice] = useState(String(original.price));
-  const [description, setDescription] = useState(original.description);
+  const [title, setTitle] = useState("");
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [size, setSize] = useState("");
+  const [color, setColor] = useState("");
+  const [grade, setGrade] = useState<ConditionGrade>("GOOD");
+  const [price, setPrice] = useState("");
+  const [description, setDescription] = useState("");
 
-  const handleSubmit = () => {
-    // PATCH /products/{productId}
-    console.log("상품 수정:", { productId, title, category, size, color, price });
-    alert("상품 정보가 수정되었습니다.");
-    navigate("/my/sales");
+  // 상품을 불러오면 폼 초기값으로 채운다
+  useEffect(() => {
+    if (!product) return;
+    setTitle(product.title);
+    setCategoryId(product.category?.id ?? null);
+    setSize(product.size ?? "");
+    setColor(product.color ?? "");
+    setGrade(product.conditionGrade);
+    setPrice(String(product.price));
+    setDescription(product.description ?? "");
+  }, [product]);
+
+  const handleSubmit = async () => {
+    await run(async () => {
+      await productApi.update(id, {
+        categoryId: categoryId ?? undefined,
+        title,
+        description,
+        price: Number(price),
+        size: size || undefined,
+        color: color || undefined,
+        conditionGrade: grade,
+      });
+      alert("상품 정보가 수정되었습니다.");
+      navigate("/my/sales");
+    });
   };
+
+  const handleDelete = async () => {
+    if (!window.confirm("상품을 삭제할까요? 되돌릴 수 없습니다.")) return;
+    await run(async () => {
+      await productApi.remove(id);
+      alert("상품이 삭제되었습니다.");
+      navigate("/my/sales");
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="create-page">
+        <Header />
+        <div className="create-body">불러오는 중...</div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="create-page">
+        <Header />
+        <div className="create-body">{error ?? "상품을 찾을 수 없습니다."}</div>
+      </div>
+    );
+  }
+
+  // 입고 확인이 끝나면 서버가 409로 막는다. 화면에서도 미리 알려준다.
+  const editable = product.status === "PENDING_INBOUND";
 
   return (
     <div className="create-page">
-      <Header loggedIn userName={mockProfile.nickname} />
+      <Header />
       <div className="create-body">
         <h2 className="create-title">상품 수정</h2>
         <p className="create-desc">
-          입고 확인 전 상품만 수정할 수 있습니다.
+          {editable
+            ? "입고 확인 전 상품만 수정할 수 있습니다."
+            : "⚠️ 이미 입고 확인된 상품이라 수정할 수 없습니다."}
         </p>
 
         <div className="create-content">
@@ -49,13 +102,20 @@ function ProductEditPage() {
           <div className="create-left">
             <h4 className="create-section-title">상품 이미지</h4>
             <div className="image-grid">
-              {[1, 2, 3].map((n) => (
-                <div className="image-box filled" key={n}>
-                  이미지 {n}
-                  {n === 1 && <span className="thumb-badge">대표</span>}
+              {product.images.map((img, i) => (
+                <div
+                  className="image-box filled"
+                  key={img.imageId}
+                  style={{
+                    backgroundImage: `url(${resolveImageUrl(img.url)})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  {img.isThumbnail && <span className="thumb-badge">대표</span>}
+                  {i === -1 && null}
                 </div>
               ))}
-              <button className="image-box add">+ 추가</button>
             </div>
           </div>
 
@@ -63,19 +123,20 @@ function ProductEditPage() {
           <div className="create-right">
             <div className="create-field">
               <label>상품명 <span className="required">*</span></label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} disabled={!editable} />
             </div>
 
             <div className="create-field">
               <label>카테고리 <span className="required">*</span></label>
               <div className="chip-row">
-                {categories.map((cat) => (
+                {(categories ?? []).flatMap((cat) => [cat, ...cat.children]).map((cat) => (
                   <button
-                    key={cat}
-                    className={`form-chip ${category === cat ? "active" : ""}`}
-                    onClick={() => setCategory(cat)}
+                    key={cat.id}
+                    className={`form-chip ${categoryId === cat.id ? "active" : ""}`}
+                    onClick={() => setCategoryId(cat.id)}
+                    disabled={!editable}
                   >
-                    {cat}
+                    {cat.name}
                   </button>
                 ))}
               </div>
@@ -90,6 +151,7 @@ function ProductEditPage() {
                       key={s}
                       className={`form-chip ${size === s ? "active" : ""}`}
                       onClick={() => setSize(s)}
+                      disabled={!editable}
                     >
                       {s}
                     </button>
@@ -99,10 +161,7 @@ function ProductEditPage() {
 
               <div className="create-field">
                 <label>색상</label>
-                <input
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                />
+                <input value={color} onChange={(e) => setColor(e.target.value)} disabled={!editable} />
               </div>
             </div>
 
@@ -111,11 +170,12 @@ function ProductEditPage() {
               <div className="chip-row">
                 {grades.map((g) => (
                   <button
-                    key={g.value}
-                    className={`form-chip ${grade === g.value ? "active" : ""}`}
-                    onClick={() => setGrade(g.value)}
+                    key={g}
+                    className={`form-chip ${grade === g ? "active" : ""}`}
+                    onClick={() => setGrade(g)}
+                    disabled={!editable}
                   >
-                    {g.label}
+                    {CONDITION_LABEL[g]}
                   </button>
                 ))}
               </div>
@@ -127,6 +187,7 @@ function ProductEditPage() {
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
+                disabled={!editable}
               />
             </div>
 
@@ -136,15 +197,23 @@ function ProductEditPage() {
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                disabled={!editable}
               />
             </div>
 
             <div className="edit-actions">
-              <button className="btn-cancel" onClick={() => navigate(-1)}>
-                취소
-              </button>
-              <button className="create-submit edit-submit" onClick={handleSubmit}>
-                수정 완료
+              <button className="btn-cancel" onClick={() => navigate(-1)}>취소</button>
+              {editable && (
+                <button className="btn-cancel" onClick={handleDelete} disabled={running}>
+                  삭제
+                </button>
+              )}
+              <button
+                className="create-submit edit-submit"
+                onClick={handleSubmit}
+                disabled={!editable || running}
+              >
+                {running ? "처리 중..." : "수정 완료"}
               </button>
             </div>
           </div>

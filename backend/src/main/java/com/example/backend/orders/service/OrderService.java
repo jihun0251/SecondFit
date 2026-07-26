@@ -125,6 +125,22 @@ public class OrderService {
 
     // ===================== 관리자 =====================
 
+    /** 관리자 주문 목록 (status 없으면 전체) */
+    public PageResponse<OrderResponses.AdminItem> getOrdersForAdmin(Order.Status status,
+                                                                    int page, int size) {
+        Pageable pageable = PageRequest.of(
+                Math.max(page, 0),
+                size <= 0 ? 20 : Math.min(size, 100),
+                Sort.by(Sort.Direction.ASC, "paidAt") // 먼저 결제된 건부터 처리
+        );
+
+        Page<Order> result = (status == null)
+                ? orderRepository.findAll(pageable)
+                : orderRepository.findByStatus(status, pageable);
+
+        return PageResponse.of(result, OrderResponses.AdminItem::from);
+    }
+
     /** 출고 처리 (송장 등록) */
     @Transactional
     public OrderResponses.Shipped ship(Long orderId, OrderRequests.Ship request) {

@@ -1,5 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import "./AdminLayout.css";
 
 const adminMenu = [
@@ -11,6 +12,13 @@ const adminMenu = [
 
 function AdminLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
   return (
     <div className="admin-layout">
@@ -25,9 +33,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
             <Link
               key={item.path}
               to={item.path}
-              className={`admin-nav-item ${
-                location.pathname === item.path ? "active" : ""
-              }`}
+              className={`admin-nav-item ${location.pathname === item.path ? "active" : ""}`}
             >
               {item.label}
             </Link>
@@ -39,7 +45,12 @@ function AdminLayout({ children }: { children: ReactNode }) {
       <div className="admin-content">
         <header className="admin-topbar">
           <span className="admin-topbar-title">본사 관리자</span>
-          <span className="admin-topbar-user">admin@secondfit</span>
+          <span className="admin-topbar-user">
+            {user?.nickname ?? "-"}
+            <button className="admin-btn ghost" style={{ marginLeft: 12 }} onClick={handleLogout}>
+              로그아웃
+            </button>
+          </span>
         </header>
         <main className="admin-main">{children}</main>
       </div>

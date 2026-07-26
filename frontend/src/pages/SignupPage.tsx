@@ -1,38 +1,31 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { userApi } from "../api";
+import { ApiError } from "../api/client";
 import "./SignupPage.css";
-import { Link } from "react-router-dom";
 
 function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
 
   const handleSubmit = async () => {
+    setError(null);
+    setLoading(true);
     try {
-      const response = await fetch("http://localhost:8080/api/v1/users/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email,
-          password: password,
-          nickname: nickname,
-          phone: phone,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        console.log("회원가입 성공:", data);
-        alert("회원가입 성공!");
-      } else {
-        console.log("회원가입 실패:", data);
-        alert("실패: " + data.error.message);
-      }
-    } catch (error) {
-      console.error("요청 중 오류:", error);
-      alert("서버에 연결할 수 없습니다.");
+      await userApi.signup({ email, password, nickname, phone: phone || undefined });
+      alert("회원가입이 완료되었습니다. 로그인해 주세요.");
+      navigate("/login", { replace: true });
+    } catch (e) {
+      // 백엔드가 이메일/닉네임 중복, 비밀번호 규칙 위반 등을 메시지로 내려준다
+      setError(e instanceof ApiError ? e.message : "회원가입에 실패했습니다.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,11 +65,6 @@ function SignupPage() {
           />
         </div>
 
-        <div className="signup-links">
-          <span>이미 계정이 있으신가요? </span>
-          <Link to="/login">로그인</Link>
-        </div>
-
         <div className="signup-field">
           <label>전화번호 (선택)</label>
           <input
@@ -87,9 +75,16 @@ function SignupPage() {
           />
         </div>
 
-        <button className="signup-button" onClick={handleSubmit}>
-          가입하기
+        {error && <p className="signup-error">{error}</p>}
+
+        <button className="signup-button" onClick={handleSubmit} disabled={loading}>
+          {loading ? "가입 중..." : "가입하기"}
         </button>
+
+        <div className="signup-links">
+          <span>이미 계정이 있으신가요? </span>
+          <Link to="/login">로그인</Link>
+        </div>
       </div>
     </div>
   );

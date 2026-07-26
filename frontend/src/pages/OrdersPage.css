@@ -100,3 +100,7 @@
   color: #ffffff;
   border-color: #111827;
 }
+/* 취소된 주문 */
+.order-status.st-cancelled {
+  color: #999;
+}

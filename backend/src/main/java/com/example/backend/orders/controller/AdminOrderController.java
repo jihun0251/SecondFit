@@ -1,8 +1,10 @@
 package com.example.backend.orders.controller;
 
 import com.example.backend.global.common.ApiResponse;
+import com.example.backend.global.common.PageResponse;
 import com.example.backend.orders.dto.OrderRequests;
 import com.example.backend.orders.dto.OrderResponses;
+import com.example.backend.orders.entity.Order;
 import com.example.backend.orders.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,20 @@ import org.springframework.web.bind.annotation.*;
 public class AdminOrderController {
 
     private final OrderService orderService;
+
+    /**
+     * 주문 목록 조회 (status: PAID / SHIPPED / DELIVERED / CONFIRMED / CANCELLED).
+     * ⚠️ 명세서에 없는 추가 엔드포인트 — 관리자가 출고할 주문을 찾으려면 목록이 필요하다.
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<OrderResponses.AdminItem>>> getOrders(
+            @RequestParam(required = false) Order.Status status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.getOrdersForAdmin(status, page, size)));
+    }
 
     /** 출고 처리 — 송장 등록. order PAID → SHIPPED, product PAID → SHIPPED */
     @PostMapping("/{orderId}/ship")

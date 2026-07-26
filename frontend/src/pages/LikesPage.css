@@ -125,3 +125,10 @@
   font-weight: 700;
   color: #111827;
 }
+/* 찜한 시점보다 가격이 내려갔을 때 */
+.like-price-drop {
+  margin-left: 6px;
+  color: #d32f2f;
+  font-size: 13px;
+  font-weight: 600;
+}

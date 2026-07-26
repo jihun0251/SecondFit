@@ -246,3 +246,26 @@
 .admin-table .fee {
   color: #dc2626;
 }
+/* 상태 필터 탭 (관리자 화면 공통)
+   SalesPage.css에도 같은 이름이 있지만 관리자 페이지는 그 파일을 import하지 않으므로 여기에 둔다 */
+.admin-main .sales-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 20px;
+}
+.admin-main .sales-tab {
+  padding: 8px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 999px;
+  background: #fff;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+}
+.admin-main .sales-tab:hover { border-color: #bbb; }
+.admin-main .sales-tab.active {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+  font-weight: 600;
+}

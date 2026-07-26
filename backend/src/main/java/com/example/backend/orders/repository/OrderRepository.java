@@ -13,6 +13,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findByBuyerIdAndStatus(Long buyerId, Order.Status status, Pageable pageable);
 
+    /** 관리자 주문 목록 (상태 필터) */
+    Page<Order> findByStatus(Order.Status status, Pageable pageable);
+
     /**
      * 판매자의 거래 완료 건수 (프로필의 tradeCount).
      * orders에는 seller 컬럼이 없으므로 product를 거쳐 seller를 찾아간다.

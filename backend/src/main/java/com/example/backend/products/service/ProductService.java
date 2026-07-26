@@ -158,6 +158,14 @@ public class ProductService {
     }
 
     /**
+     * 상품 등록 전 이미지 업로드.
+     * 파일을 저장하고 접근 URL만 돌려준다 (아직 어떤 상품에도 붙지 않은 상태).
+     */
+    public String uploadImage(MultipartFile file) {
+        return fileStorageService.store(file);
+    }
+
+    /**
      * AI 자동 태깅.
      * 추론 결과를 "제안값"으로 돌려줄 뿐 DB에는 저장하지 않는다.
      * (판매자가 확인·수정한 최종값이 상품 등록 때 들어온다)

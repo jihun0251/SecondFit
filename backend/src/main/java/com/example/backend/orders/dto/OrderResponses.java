@@ -55,6 +55,41 @@ public final class OrderResponses {
         }
     }
 
+    /**
+     * 관리자 주문 목록 한 줄.
+     * ⚠️ 명세서에 없는 추가 응답 — 관리자가 출고할 주문을 고르려면 목록이 필요한데
+     * 명세에는 GET /admin/orders가 없어서 추가했다.
+     */
+    @Getter
+    public static class AdminItem {
+        private final Long orderId;
+        private final Long productId;
+        private final String title;
+        private final String buyer;
+        private final int orderPrice;
+        private final Order.Status status;
+        private final String trackingNo;
+        private final boolean shippingReady;
+        private final LocalDateTime paidAt;
+
+        private AdminItem(Order o) {
+            this.orderId = o.getId();
+            this.productId = o.getProduct().getId();
+            this.title = o.getProduct().getTitle();
+            this.buyer = o.getBuyer().getNickname();
+            this.orderPrice = o.getOrderPrice();
+            this.status = o.getStatus();
+            this.trackingNo = o.getTrackingNo();
+            // 배송지가 없으면 출고할 수 없다 — 관리자가 미리 알 수 있게 내려준다
+            this.shippingReady = o.getReceiverName() != null && o.getAddress1() != null;
+            this.paidAt = o.getPaidAt();
+        }
+
+        public static AdminItem from(Order order) {
+            return new AdminItem(order);
+        }
+    }
+
     /** PATCH /orders/{id}/shipping → { orderId, shippingSaved, status } */
     @Getter
     public static class ShippingSaved {

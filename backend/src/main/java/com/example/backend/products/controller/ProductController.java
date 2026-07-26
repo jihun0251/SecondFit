@@ -14,6 +14,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -40,6 +42,25 @@ public class ProductController {
             @ModelAttribute ProductSearchCondition condition) {
 
         return ResponseEntity.ok(ApiResponse.success(productService.search(condition)));
+    }
+
+    /**
+     * 상품 등록 전 이미지 업로드 → URL 반환.
+     * <p>
+     * ⚠️ 명세서에 없는 추가 엔드포인트다. 명세상 POST /products는 이미지 "URL 배열"을 요구하는데,
+     * 업로드 API(POST /products/{id}/images)는 이미 존재하는 상품을 전제로 해서
+     * "등록하려면 URL이 필요한데, URL을 얻으려면 상품이 있어야 하는" 순환이 생긴다.
+     * S3 presigned URL을 쓰는 환경이라면 프론트가 직접 올리면 되지만,
+     * 로컬 디스크 저장 방식에서는 이 엔드포인트가 그 역할을 대신한다.
+     * <p>
+     * ⚠️ 경로가 /products/{productId}보다 구체적이라 "images"가 productId로 해석되지 않는다.
+     */
+    @PostMapping(value = "/images/upload", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadImage(
+            @RequestPart("file") MultipartFile file) {
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(Map.of("url", productService.uploadImage(file))));
     }
 
     /**

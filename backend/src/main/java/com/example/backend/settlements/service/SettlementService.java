@@ -51,6 +51,22 @@ public class SettlementService {
         return SettlementDtos.Detail.from(settlement);
     }
 
+    /** 관리자 정산 목록 (status 없으면 전체) */
+    public PageResponse<SettlementDtos.AdminItem> getSettlementsForAdmin(Settlement.Status status,
+                                                                         int page, int size) {
+        Pageable pageable = PageRequest.of(
+                Math.max(page, 0),
+                size <= 0 ? 20 : Math.min(size, 100),
+                Sort.by(Sort.Direction.ASC, "createdAt") // 먼저 확정된 건부터 정산
+        );
+
+        Page<Settlement> result = (status == null)
+                ? settlementRepository.findAll(pageable)
+                : settlementRepository.findByStatus(status, pageable);
+
+        return PageResponse.of(result, SettlementDtos.AdminItem::from);
+    }
+
     /** 관리자 정산 완료 처리 (실제 송금 후 호출) */
     @Transactional
     public SettlementDtos.Completed complete(Long adminId, Long settlementId) {

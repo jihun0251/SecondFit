@@ -216,3 +216,10 @@
 .product-like.liked {
   color: #ef4444;
 }
+/* 로딩 / 에러 / 빈 목록 안내 */
+.home-state {
+  padding: 48px 0;
+  text-align: center;
+  color: #777;
+  font-size: 14px;
+}
