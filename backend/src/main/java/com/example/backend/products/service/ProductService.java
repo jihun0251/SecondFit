@@ -8,11 +8,15 @@ import com.example.backend.global.exception.ErrorCode;
 import com.example.backend.global.file.FileStorageService;
 import com.example.backend.inbounds.entity.Inbound;
 import com.example.backend.inbounds.repository.InboundRepository;
+import com.example.backend.products.client.AiTaggingClient;
 import com.example.backend.products.dto.*;
 import com.example.backend.products.entity.Product;
 import com.example.backend.products.entity.ProductImage;
 import com.example.backend.products.repository.ProductRepository;
 import com.example.backend.products.repository.ProductSpecification;
+import com.example.backend.reports.entity.Report;
+import com.example.backend.reports.repository.ReportRepository;
+import com.example.backend.wishlists.repository.WishlistRepository;
 import com.example.backend.users.entity.User;
 import com.example.backend.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +43,10 @@ public class ProductService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final InboundRepository inboundRepository;
+    private final WishlistRepository wishlistRepository;
+    private final ReportRepository reportRepository;
     private final FileStorageService fileStorageService;
+    private final AiTaggingClient aiTaggingClient;
 
     // ===================== 등록 =====================
 
@@ -135,6 +142,33 @@ public class ProductService {
         return ProductDetailResponse.from(product);
     }
 
+    /** 카테고리별 판매중 상품 (GET /categories/{categoryId}/products) */
+    public PageResponse<ProductSummaryResponse> getByCategory(Long categoryId, String sort,
+                                                              int page, int size) {
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
+
+        Pageable pageable = PageRequest.of(Math.max(page, 0), normalizeSize(size), toSort(sort));
+
+        return PageResponse.of(
+                productRepository.findByCategoryIdAndStatusAndSuspendedFalse(
+                        categoryId, Product.Status.ON_SALE, pageable),
+                ProductSummaryResponse::from);
+    }
+
+    /**
+     * AI 자동 태깅.
+     * 추론 결과를 "제안값"으로 돌려줄 뿐 DB에는 저장하지 않는다.
+     * (판매자가 확인·수정한 최종값이 상품 등록 때 들어온다)
+     */
+    public AiTaggingResponse aiTagging(MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new BusinessException(ErrorCode.FILE_EMPTY);
+        }
+        return aiTaggingClient.predict(image);
+    }
+
     /**
      * 내 판매 내역 (GET /products/me).
      * status가 있으면 해당 상태만, 없으면 전체.
@@ -184,10 +218,15 @@ public class ProductService {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_DELETABLE);
         }
 
-        // 상품 등록 시 같이 만든 입고 건을 먼저 지운다.
-        // Product 쪽에는 Inbound로 가는 연관관계가 없어서 JPA가 알아서 지워주지 못하고,
-        // 그냥 두면 inbounds.product_id 외래키 제약에 걸려 삭제가 실패한다.
+        // 이 상품을 참조하는 다른 테이블의 행을 먼저 정리해야 한다.
+        // Product 엔티티에는 이들로 가는 연관관계가 없어서 JPA가 알아서 못 지우고,
+        // 그냥 두면 외래키 제약에 걸려 삭제가 통째로 실패한다.
+        //
+        // (주문/결제/정산은 PENDING_INBOUND 상품에는 존재할 수 없으므로 대상이 아니다)
         inboundRepository.findByProductId(productId).ifPresent(inboundRepository::delete);
+        wishlistRepository.deleteByProductId(productId);
+        // 신고는 기록을 남겨야 하므로 삭제하지 않고 참조만 끊는다
+        reportRepository.findByProductId(productId).forEach(Report::detachProduct);
 
         productRepository.delete(product); // cascade + orphanRemoval로 이미지도 함께 삭제
     }

@@ -436,3 +436,195 @@ Authorization: Bearer {{buyerToken}}
 ### 58. [판매자] 내 판매 내역 — SETTLED 확인
 GET {{host}}/products/me?status=SETTLED
 Authorization: Bearer {{sellerToken}}
+
+### ============================================================
+### 회원 프로필 / 리뷰 / 찜 / 신고 / AI 태깅
+### 앞의 E2E(30~58)를 먼저 실행해서 거래가 확정된 상태여야 리뷰가 작성됩니다.
+### ============================================================
+
+### 60. 내 프로필 조회 (전화번호 마스킹 확인)
+GET {{host}}/users/me
+Authorization: Bearer {{sellerToken}}
+
+### 61. 내 프로필 수정 (정산계좌 등록)
+PATCH {{host}}/users/me
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "phone": "010-9999-8888", "settlementAccount": "카카오뱅크 3333-01-1234567" }
+
+### 61-1. 닉네임 중복 수정 시도 (409 USER_409_2 기대)
+PATCH {{host}}/users/me
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "nickname": "buyer_lee" }
+
+### 62. 공개 프로필 조회 (인증 불필요, 판매중 상품 + 평점)
+GET {{host}}/users/{{userId}}
+
+### ---------- 리뷰 ----------
+
+### 63. [구매자] 리뷰 작성 — 거래 확정된 주문에만 가능
+# @name createReview
+POST {{host}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "rating": 5, "content": "상태 설명 그대로예요. 좋은 거래 감사합니다." }
+
+> {% client.global.set("reviewId", response.body.data.reviewId); %}
+
+### 63-1. 같은 주문에 리뷰 재작성 (409 REVIEW_409_1 기대)
+POST {{host}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "rating": 3 }
+
+### 63-2. 평점 범위 초과 (400 기대)
+POST {{host}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "rating": 6 }
+
+### 64. 판매자 리뷰 목록 (인증 불필요, averageRating 포함)
+GET {{host}}/users/{{userId}}/reviews?page=0&size=20
+
+### 65. [판매자] 남의 리뷰 삭제 시도 (403 REVIEW_403 기대)
+DELETE {{host}}/reviews/{{reviewId}}
+Authorization: Bearer {{sellerToken}}
+
+### ---------- 찜 ----------
+
+### 66. [판매자] 상품 등록 (찜/신고 테스트용)
+# @name wishTarget
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{
+  "categoryId": 1,
+  "title": "찜 테스트용 니트",
+  "price": 50000,
+  "conditionGrade": "GOOD",
+  "images": ["https://picsum.photos/id/1035/600/800"]
+}
+
+> {% client.global.set("wishProductId", response.body.data.productId); %}
+
+### 67. [구매자] 찜 추가
+POST {{host}}/wishlists
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{wishProductId}} }
+
+### 67-1. 중복 찜 (409 WISHLIST_409 기대)
+POST {{host}}/wishlists
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{wishProductId}} }
+
+### 68. [판매자] 가격 인하 (찜 목록의 priceChange 확인용)
+PATCH {{host}}/products/{{wishProductId}}
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "price": 44000 }
+
+### 69. [구매자] 찜 목록 — priceChange가 -6000으로 나와야 함
+GET {{host}}/wishlists
+Authorization: Bearer {{buyerToken}}
+
+### 70. [구매자] 찜 취소 (경로 변수는 productId) → 204
+DELETE {{host}}/wishlists/{{wishProductId}}
+Authorization: Bearer {{buyerToken}}
+
+### 70-1. 찜 안 한 상품 취소 (404 WISHLIST_404 기대)
+DELETE {{host}}/wishlists/{{wishProductId}}
+Authorization: Bearer {{buyerToken}}
+
+### ---------- 신고 ----------
+
+### 71. [판매자] 본인 상품 신고 시도 (403 REPORT_403 기대)
+POST {{host}}/reports
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "productId": {{wishProductId}}, "reason": "FAKE", "detail": "본인 상품" }
+
+### 72. [구매자] 신고 접수
+# @name createReport
+POST {{host}}/reports
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{wishProductId}}, "reason": "FAKE", "detail": "명품 정품 허위 기재 의심" }
+
+> {% client.global.set("reportId", response.body.data.reportId); %}
+
+### 73. [관리자] 신고 목록 (count = 같은 상품 누적 신고 수)
+GET {{host}}/admin/reports?status=RECEIVED
+Authorization: Bearer {{adminToken}}
+
+### 74. [관리자] 신고 처리 + 상품 노출 중지
+PATCH {{host}}/admin/reports/{{reportId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "RESOLVED", "action": "SUSPEND_PRODUCT" }
+
+### 74-1. 이미 처리된 신고 재처리 (409 REPORT_409 기대)
+PATCH {{host}}/admin/reports/{{reportId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "REJECTED" }
+
+### 75. 노출 중지된 상품이 목록에서 사라졌는지 확인
+GET {{host}}/products?keyword=찜 테스트용
+
+### ---------- 카테고리별 상품 / AI 태깅 ----------
+
+### 76. 카테고리별 판매중 상품 (인증 불필요)
+GET {{host}}/categories/1/products?sort=latest&page=0&size=20
+
+### 76-1. 없는 카테고리 (404 CATEGORY_404 기대)
+GET {{host}}/categories/999999/products
+
+### 77. AI 자동 태깅
+### ⚠️ ai-server가 꺼져 있어도 200 + available=false로 응답해야 정상입니다.
+###    켜려면: cd ai-server && uvicorn main:app --port 8000
+POST {{host}}/products/ai-tagging
+Authorization: Bearer {{sellerToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="image"; filename="sample.jpg"
+Content-Type: image/jpeg
+
+< ./sample.jpg
+--WebAppBoundary--
+
+### 78. AI 태깅 - 토큰 없이 (401 기대)
+POST {{host}}/products/ai-tagging
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="image"; filename="sample.jpg"
+Content-Type: image/jpeg
+
+< ./sample.jpg
+--WebAppBoundary--
+
+### 79. [판매자] 찜/신고가 달린 상품 삭제 → 204 (FK 충돌 없이 지워져야 함)
+DELETE {{host}}/products/{{wishProductId}}
+Authorization: Bearer {{sellerToken}}
+
+### 80. 회원 탈퇴 → 204 (status=WITHDRAWN, 레코드는 남음)
+### ⚠️ 실행하면 해당 계정으로 재로그인이 막힙니다. 마지막에 실행하세요.
+# DELETE {{host}}/users/me
+# Authorization: Bearer {{buyerToken}}

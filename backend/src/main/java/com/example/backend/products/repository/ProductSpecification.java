@@ -26,6 +26,8 @@ public final class ProductSpecification {
 
             // 목록에는 판매중인 상품만 노출한다 (입고 대기/결제완료 등은 숨김)
             predicates.add(cb.equal(root.get("status"), Product.Status.ON_SALE));
+            // 신고 처리로 노출 중지된 상품은 제외
+            predicates.add(cb.isFalse(root.get("suspended")));
 
             if (StringUtils.hasText(cond.getKeyword())) {
                 predicates.add(cb.like(root.get("title"), "%" + cond.getKeyword().trim() + "%"));

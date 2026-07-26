@@ -72,6 +72,26 @@ public class User {
         this.status = Status.ACTIVE; // 가입 시 기본 ACTIVE
     }
 
+    /**
+     * 프로필 부분 수정 (PATCH). null인 필드는 "변경 안 함".
+     * 닉네임 중복 검사는 서비스에서 먼저 하고 들어온다.
+     */
+    public void updateProfile(String nickname, String phone, String profileImage, String settlementAccount) {
+        if (nickname != null) this.nickname = nickname;
+        if (phone != null) this.phone = phone;
+        if (profileImage != null) this.profileImage = profileImage;
+        if (settlementAccount != null) this.settlementAccount = settlementAccount;
+    }
+
+    /**
+     * 회원 탈퇴.
+     * 레코드를 지우지 않고 상태만 바꾼다 — 주문/정산 이력이 FK로 물려 있어서
+     * 실제 삭제하면 과거 거래 기록이 통째로 무너지기 때문.
+     */
+    public void withdraw() {
+        this.status = Status.WITHDRAWN;
+    }
+
     public enum Role { USER, ADMIN }
     public enum Status { ACTIVE, SUSPENDED, WITHDRAWN }
 }

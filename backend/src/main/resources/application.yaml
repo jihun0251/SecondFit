@@ -30,3 +30,10 @@ jwt:
 file:
   # 상품 이미지 저장 위치 (로컬 디스크). 운영에선 S3로 교체.
   upload-dir: ${FILE_UPLOAD_DIR:./uploads}
+
+ai:
+  server:
+    # FastAPI 추론 서버 (ai-server/). 꺼져 있어도 상품 등록은 정상 동작한다 (fail-safe).
+    base-url: ${AI_SERVER_URL:http://localhost:8000}
+    connect-timeout-ms: 1000
+    read-timeout-ms: 3000

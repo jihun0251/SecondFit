@@ -43,6 +43,18 @@ public class ProductController {
     }
 
     /**
+     * AI 자동 태깅 — 대표 이미지를 FastAPI 추론 서버로 보내 제안값을 받는다.
+     * ⚠️ /{productId} 매핑보다 위에 있어야 "ai-tagging"이 productId로 해석되지 않는다.
+     * ⚠️ 추론 서버가 죽어도 200 + available=false로 응답한다 (등록 플로우를 막지 않기 위함).
+     */
+    @PostMapping(value = "/ai-tagging", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<AiTaggingResponse>> aiTagging(
+            @RequestPart("image") MultipartFile image) {
+
+        return ResponseEntity.ok(ApiResponse.success(productService.aiTagging(image)));
+    }
+
+    /**
      * 내 판매 내역 조회.
      * ⚠️ 아래 /{productId} 매핑보다 위에 있어야 "me"가 productId로 해석되지 않는다.
      * ⚠️ 페이지 크기 파라미터가 목록 API는 pageSize, 여기는 size다 (명세서 기준).

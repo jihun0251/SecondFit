@@ -6,6 +6,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+import java.util.List;
+
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
     /**
@@ -19,4 +21,12 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     /** 내가 등록한 상품 중 특정 상태만 (GET /products/me?status=ON_SALE) */
     Page<Product> findBySellerIdAndStatus(Long sellerId, Product.Status status, Pageable pageable);
+
+    /** 공개 프로필에 보여줄 판매중 상품 (최신 20건) */
+    List<Product> findTop20BySellerIdAndStatusAndSuspendedFalseOrderByCreatedAtDesc(
+            Long sellerId, Product.Status status);
+
+    /** 카테고리별 판매중 상품 (GET /categories/{id}/products) */
+    Page<Product> findByCategoryIdAndStatusAndSuspendedFalse(
+            Long categoryId, Product.Status status, Pageable pageable);
 }

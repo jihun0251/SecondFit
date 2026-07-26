@@ -58,11 +58,16 @@ public class SecurityConfig {
                         // 인증 불필요
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/signup").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        // 카테고리 트리 + 카테고리별 상품
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
 
-                        // /products/me 는 인증 필요 → /products/* 보다 반드시 먼저 선언
+                        // /me 는 인증 필요 → /* 보다 반드시 먼저 선언 (안 그러면 "me"가 ID로 잡힘)
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/*").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
+                        // 공개 프로필 + 판매자 리뷰 목록
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/*", "/api/v1/users/*/reviews").permitAll()
 
                         // 관리자 전용 (도메인 구현은 이후 단계)
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

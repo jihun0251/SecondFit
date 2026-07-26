@@ -72,6 +72,14 @@ public class Product {
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
 
+    /**
+     * 신고 처리로 노출 중지된 상품.
+     * 거래 상태(status)와는 별개 축으로 둔다 — 상태머신에 SUSPENDED를 끼워 넣으면
+     * 모든 전이 규칙이 "그런데 정지 상태라면?"으로 오염되기 때문.
+     */
+    @Column(nullable = false)
+    private boolean suspended = false;
+
     // --- AI 자동 태깅 제안값 (판매자가 수정하기 전 원본 예측을 그대로 보관) ---
     @Column(name = "ai_suggested_category", length = 50)
     private String aiSuggestedCategory;
@@ -209,6 +217,11 @@ public class Product {
         if (this.status != expected) {
             throw new BusinessException(errorCode);
         }
+    }
+
+    /** 신고 처리(SUSPEND_PRODUCT)로 노출 중지 */
+    public void suspend() {
+        this.suspended = true;
     }
 
     /** 목록 화면에 쓸 대표 이미지 URL (대표 지정이 없으면 첫 장) */

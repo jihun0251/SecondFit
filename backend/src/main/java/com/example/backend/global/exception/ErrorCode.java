@@ -61,6 +61,21 @@ public enum ErrorCode {
     SETTLEMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "SETTLEMENT_403", "조회 권한이 없습니다."),
     SETTLEMENT_ALREADY_COMPLETED(HttpStatus.CONFLICT, "SETTLEMENT_409", "이미 정산 완료된 건입니다."),
 
+    // 리뷰
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_404", "존재하지 않는 리뷰입니다."),
+    REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "REVIEW_403", "본인이 작성한 리뷰가 아닙니다."),
+    REVIEW_ALREADY_WRITTEN(HttpStatus.CONFLICT, "REVIEW_409_1", "이미 리뷰를 작성한 주문입니다."),
+    REVIEW_NOT_ALLOWED(HttpStatus.CONFLICT, "REVIEW_409_2", "거래 확정된 주문에만 리뷰를 작성할 수 있습니다."),
+
+    // 찜
+    WISHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "WISHLIST_404", "찜하지 않은 상품입니다."),
+    WISHLIST_DUPLICATED(HttpStatus.CONFLICT, "WISHLIST_409", "이미 찜한 상품입니다."),
+
+    // 신고
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_404", "존재하지 않는 신고입니다."),
+    REPORT_ALREADY_HANDLED(HttpStatus.CONFLICT, "REPORT_409", "이미 처리된 신고입니다."),
+    SELF_REPORT_NOT_ALLOWED(HttpStatus.FORBIDDEN, "REPORT_403", "본인이 등록한 상품은 신고할 수 없습니다."),
+
     // 파일
     FILE_EMPTY(HttpStatus.BAD_REQUEST, "FILE_400_1", "빈 파일입니다."),
     FILE_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "FILE_400_2", "이미지 파일(jpg, jpeg, png, webp, gif)만 업로드할 수 있습니다."),

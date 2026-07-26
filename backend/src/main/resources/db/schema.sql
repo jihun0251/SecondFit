@@ -64,6 +64,8 @@ CREATE TABLE products (
     status        ENUM('PENDING_INBOUND','ON_SALE','PAID','SHIPPED','DELIVERED','SETTLED')
                   NOT NULL DEFAULT 'PENDING_INBOUND',
     view_count    INT          NOT NULL DEFAULT 0,
+    -- 신고 처리(SUSPEND_PRODUCT)로 노출 중지된 상품. 거래 상태(status)와는 별개 축이다.
+    suspended     BOOLEAN      NOT NULL DEFAULT FALSE,
     -- AI 자동 태깅 제안값 (판매자 확인/수정 전 원본 예측 보관)
     ai_suggested_category VARCHAR(50)  NULL,
     ai_suggested_color    VARCHAR(30)  NULL,
@@ -104,6 +106,9 @@ CREATE TABLE wishlists (
     id         BIGINT   NOT NULL AUTO_INCREMENT,
     user_id    BIGINT   NOT NULL,
     product_id BIGINT   NOT NULL,
+    -- 찜한 시점의 가격. 찜 목록의 priceChange(가격 변동)를 계산하려면 기준값이 필요한데
+    -- 최초 DDL에 없어서 추가했다.
+    price_at_wish INT   NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_wishlists_user_product (user_id, product_id),
@@ -253,6 +258,8 @@ CREATE TABLE reports (
     admin_id     BIGINT   NULL,                  -- 처리 관리자
     reason       ENUM('FAKE','ABUSE','PROHIBITED','SPAM','ETC') NOT NULL,
     detail       VARCHAR(500) NULL,
+    -- 관리자 조치 내용 (예: SUSPEND_PRODUCT). 명세 PATCH /admin/reports에 있으나 DDL에 누락되어 추가함.
+    action       VARCHAR(50)  NULL,
     status       ENUM('RECEIVED','REVIEWING','RESOLVED','REJECTED') NOT NULL DEFAULT 'RECEIVED',
     created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     resolved_at  DATETIME NULL,
