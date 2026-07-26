@@ -26,7 +26,10 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     List<Product> findTop20BySellerIdAndStatusAndSuspendedFalseOrderByCreatedAtDesc(
             Long sellerId, Product.Status status);
 
-    /** 카테고리별 판매중 상품 (GET /categories/{id}/products) */
-    Page<Product> findByCategoryIdAndStatusAndSuspendedFalse(
-            Long categoryId, Product.Status status, Pageable pageable);
+    /**
+     * 카테고리별 판매중 상품 (GET /categories/{id}/products).
+     * 대분류를 고르면 하위 소분류까지 포함해야 해서 단건이 아닌 목록(In)으로 받는다.
+     */
+    Page<Product> findByCategoryIdInAndStatusAndSuspendedFalse(
+            List<Long> categoryIds, Product.Status status, Pageable pageable);
 }

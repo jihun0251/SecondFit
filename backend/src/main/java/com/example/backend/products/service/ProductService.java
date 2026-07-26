@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -110,8 +111,30 @@ public class ProductService {
                 toSort(condition.getSort())
         );
 
-        Page<Product> page = productRepository.findAll(ProductSpecification.search(condition), pageable);
+        Page<Product> page = productRepository.findAll(
+                ProductSpecification.search(condition, resolveCategoryIds(condition.getCategoryId())),
+                pageable);
         return PageResponse.of(page, ProductSummaryResponse::from);
+    }
+
+    /**
+     * 선택한 카테고리 + 하위 카테고리 ID 목록.
+     * <p>
+     * 상품은 보통 소분류('데님 자켓')에 붙지만 사용자는 대분류('아우터')로 거른다.
+     * 그래서 대분류를 고르면 그 밑의 소분류까지 함께 조회해야 한다.
+     */
+    private List<Long> resolveCategoryIds(Long categoryId) {
+        if (categoryId == null) {
+            return List.of();
+        }
+
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        List<Long> ids = new ArrayList<>();
+        ids.add(category.getId());
+        category.getChildren().forEach(child -> ids.add(child.getId()));
+        return ids;
     }
 
     private int normalizeSize(int size) {
@@ -145,15 +168,14 @@ public class ProductService {
     /** 카테고리별 판매중 상품 (GET /categories/{categoryId}/products) */
     public PageResponse<ProductSummaryResponse> getByCategory(Long categoryId, String sort,
                                                               int page, int size) {
-        if (!categoryRepository.existsById(categoryId)) {
-            throw new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
-        }
+        // 대분류를 고르면 하위 소분류 상품까지 함께 보여준다
+        List<Long> categoryIds = resolveCategoryIds(categoryId);
 
         Pageable pageable = PageRequest.of(Math.max(page, 0), normalizeSize(size), toSort(sort));
 
         return PageResponse.of(
-                productRepository.findByCategoryIdAndStatusAndSuspendedFalse(
-                        categoryId, Product.Status.ON_SALE, pageable),
+                productRepository.findByCategoryIdInAndStatusAndSuspendedFalse(
+                        categoryIds, Product.Status.ON_SALE, pageable),
                 ProductSummaryResponse::from);
     }
 

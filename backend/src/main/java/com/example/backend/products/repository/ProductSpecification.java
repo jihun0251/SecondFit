@@ -20,7 +20,11 @@ public final class ProductSpecification {
     private ProductSpecification() {
     }
 
-    public static Specification<Product> search(ProductSearchCondition cond) {
+    /**
+     * @param categoryIds 선택한 카테고리 + 그 하위 카테고리 ID들.
+     *                    비어 있으면 카테고리 필터를 걸지 않는다.
+     */
+    public static Specification<Product> search(ProductSearchCondition cond, List<Long> categoryIds) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -32,9 +36,11 @@ public final class ProductSpecification {
             if (StringUtils.hasText(cond.getKeyword())) {
                 predicates.add(cb.like(root.get("title"), "%" + cond.getKeyword().trim() + "%"));
             }
-            if (cond.getCategoryId() != null) {
-                // root.get("category").get("id")는 조인 없이 FK 컬럼(category_id)만 비교한다
-                predicates.add(cb.equal(root.get("category").get("id"), cond.getCategoryId()));
+            if (categoryIds != null && !categoryIds.isEmpty()) {
+                // ⚠️ equal이 아니라 in을 쓴다.
+                //    상품은 보통 소분류(예: '니트')에 붙는데 사용자는 대분류('상의')로 거른다.
+                //    equal로 비교하면 '상의'를 눌렀을 때 '니트' 상품이 하나도 안 걸린다.
+                predicates.add(root.get("category").get("id").in(categoryIds));
             }
             if (cond.getMinPrice() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("price"), cond.getMinPrice()));
