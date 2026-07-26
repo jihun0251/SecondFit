@@ -22,6 +22,8 @@ CREATE TABLE users (
     role          ENUM('USER','ADMIN') NOT NULL DEFAULT 'USER',
     phone         VARCHAR(20)  NULL,
     profile_image VARCHAR(500) NULL,
+    -- 판매자 정산 계좌. PATCH /users/me 명세에 있으나 최초 DDL에 누락되어 추가함.
+    settlement_account VARCHAR(100) NULL,
     status        ENUM('ACTIVE','SUSPENDED','WITHDRAWN') NOT NULL DEFAULT 'ACTIVE',
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -144,11 +146,16 @@ CREATE TABLE orders (
     status         ENUM('PAID','SHIPPED','DELIVERED','CONFIRMED','CANCELLED')
                    NOT NULL DEFAULT 'PAID',
     -- 배송지 정보
-    receiver_name  VARCHAR(50)  NOT NULL,
-    receiver_phone VARCHAR(20)  NOT NULL,
-    zipcode        VARCHAR(10)  NOT NULL,
-    address1       VARCHAR(255) NOT NULL,
+    -- ⚠️ NOT NULL이었으나 NULL 허용으로 변경함.
+    --    거래 흐름상 POST /orders(주문 생성) 시점에는 배송지가 없고,
+    --    이후 PATCH /orders/{id}/shipping에서 채워지기 때문에 NOT NULL이면 주문 생성 자체가 불가능하다.
+    receiver_name  VARCHAR(50)  NULL,
+    receiver_phone VARCHAR(20)  NULL,
+    zipcode        VARCHAR(10)  NULL,
+    address1       VARCHAR(255) NULL,
     address2       VARCHAR(255) NULL,
+    memo           VARCHAR(255) NULL,            -- 배송 메모 (PATCH /orders/{id}/shipping)
+    cancel_reason  VARCHAR(255) NULL,            -- 주문 취소 사유
     tracking_no    VARCHAR(50)  NULL,            -- 본사 → 구매자 출고 송장
     paid_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     shipped_at     DATETIME NULL,
@@ -157,7 +164,10 @@ CREATE TABLE orders (
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_orders_product (product_id),   -- 단일 재고 상품 → 주문 1건
+    -- ⚠️ uk_orders_product(유니크)에서 일반 인덱스로 변경함.
+    --    주문 취소 시 상품이 ON_SALE로 복귀하는데, 유니크면 그 상품의 재주문이 막힌다.
+    --    동시 구매 방지는 애플리케이션의 products.status(ON_SALE) 검사로 처리한다.
+    KEY idx_orders_product (product_id),
     KEY idx_orders_buyer (buyer_id),
     KEY idx_orders_status (status),
     CONSTRAINT fk_orders_product FOREIGN KEY (product_id)

@@ -21,4 +21,9 @@ public class UserPrincipal {
         this.email = email;
         this.role = role;
     }
+
+    /** "본인 또는 ADMIN" 권한 검사에 쓴다 (주문 상세 조회, 주문 취소 등) */
+    public boolean isAdmin() {
+        return this.role == User.Role.ADMIN;
+    }
 }

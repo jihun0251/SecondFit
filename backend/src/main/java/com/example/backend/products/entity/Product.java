@@ -1,6 +1,8 @@
 package com.example.backend.products.entity;
 
 import com.example.backend.categories.entity.Category;
+import com.example.backend.global.exception.BusinessException;
+import com.example.backend.global.exception.ErrorCode;
 import com.example.backend.users.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -159,6 +161,54 @@ public class Product {
         if (size != null) this.size = size;
         if (color != null) this.color = color;
         if (conditionGrade != null) this.conditionGrade = conditionGrade;
+    }
+
+    // ===================== 상태 전이 =====================
+    // 상태 머신: PENDING_INBOUND → ON_SALE → PAID → SHIPPED → DELIVERED → SETTLED
+    //
+    // 전이 규칙을 서비스 여기저기에 흩어놓으면 "어디서 상태가 바뀌었지?"를 추적할 수 없게 된다.
+    // 엔티티가 자기 상태를 스스로 지키도록 모아둔다. 전이 조건이 안 맞으면 예외.
+
+    /** 입고 확인 → 판매 시작 */
+    public void startSelling() {
+        requireStatus(Status.PENDING_INBOUND, ErrorCode.CONFLICT);
+        this.status = Status.ON_SALE;
+    }
+
+    /** 주문 생성(결제) → 판매 중단 */
+    public void markPaid() {
+        requireStatus(Status.ON_SALE, ErrorCode.PRODUCT_NOT_ON_SALE);
+        this.status = Status.PAID;
+    }
+
+    /** 주문 취소 → 다시 판매중으로 복귀 */
+    public void returnToSale() {
+        requireStatus(Status.PAID, ErrorCode.ORDER_NOT_CANCELABLE);
+        this.status = Status.ON_SALE;
+    }
+
+    /** 본사 출고 */
+    public void markShipped() {
+        requireStatus(Status.PAID, ErrorCode.ORDER_NOT_SHIPPABLE);
+        this.status = Status.SHIPPED;
+    }
+
+    /** 배송 완료 */
+    public void markDelivered() {
+        requireStatus(Status.SHIPPED, ErrorCode.ORDER_NOT_DELIVERABLE);
+        this.status = Status.DELIVERED;
+    }
+
+    /** 거래 확정 → 정산 대상 */
+    public void markSettled() {
+        requireStatus(Status.DELIVERED, ErrorCode.ORDER_NOT_CONFIRMABLE);
+        this.status = Status.SETTLED;
+    }
+
+    private void requireStatus(Status expected, ErrorCode errorCode) {
+        if (this.status != expected) {
+            throw new BusinessException(errorCode);
+        }
     }
 
     /** 목록 화면에 쓸 대표 이미지 URL (대표 지정이 없으면 첫 장) */

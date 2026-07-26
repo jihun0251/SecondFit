@@ -6,6 +6,8 @@ import com.example.backend.global.common.PageResponse;
 import com.example.backend.global.exception.BusinessException;
 import com.example.backend.global.exception.ErrorCode;
 import com.example.backend.global.file.FileStorageService;
+import com.example.backend.inbounds.entity.Inbound;
+import com.example.backend.inbounds.repository.InboundRepository;
 import com.example.backend.products.dto.*;
 import com.example.backend.products.entity.Product;
 import com.example.backend.products.entity.ProductImage;
@@ -36,6 +38,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final InboundRepository inboundRepository;
     private final FileStorageService fileStorageService;
 
     // ===================== 등록 =====================
@@ -75,6 +78,11 @@ public class ProductService {
 
         // cascade = ALL 이므로 product만 저장하면 이미지도 함께 INSERT 된다
         Product saved = productRepository.save(product);
+
+        // 상품 등록 = 판매자가 본사로 보내겠다는 뜻이므로 입고 대기 건을 같이 만든다.
+        // 이게 있어야 관리자 입고 목록에 뜨고, 입고 확인 시 판매중으로 전환된다.
+        inboundRepository.save(Inbound.createFor(saved));
+
         return ProductCreateResponse.from(saved);
     }
 
@@ -175,6 +183,11 @@ public class ProductService {
         if (!product.isEditable()) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_DELETABLE);
         }
+
+        // 상품 등록 시 같이 만든 입고 건을 먼저 지운다.
+        // Product 쪽에는 Inbound로 가는 연관관계가 없어서 JPA가 알아서 지워주지 못하고,
+        // 그냥 두면 inbounds.product_id 외래키 제약에 걸려 삭제가 실패한다.
+        inboundRepository.findByProductId(productId).ifPresent(inboundRepository::delete);
 
         productRepository.delete(product); // cascade + orphanRemoval로 이미지도 함께 삭제
     }

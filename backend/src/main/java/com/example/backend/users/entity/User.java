@@ -46,6 +46,10 @@ public class User {
     @Column(name = "profile_image", length = 500)
     private String profileImage;
 
+    /** 판매자 정산 계좌 (PATCH /users/me). 최초 DDL에 누락되어 추가한 컬럼 */
+    @Column(name = "settlement_account", length = 100)
+    private String settlementAccount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status;

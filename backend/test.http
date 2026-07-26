@@ -220,3 +220,219 @@ GET {{host}}/products/{{productId}}
 ### 22. 로그아웃
 POST {{host}}/auth/logout
 Authorization: Bearer {{accessToken}}
+
+### ============================================================
+### 전체 거래 흐름 E2E
+### 등록 → 입고확인 → 판매중 → 결제 → 출고 → 배송 → 확정 → 정산
+###
+### ⚠️ 사전 준비: 관리자 계정이 필요합니다. 회원가입은 항상 USER로 생성되므로
+###    MySQL에서 직접 승격시키세요.
+###    UPDATE users SET role='ADMIN' WHERE email='admin@email.com';
+### ============================================================
+
+### 30. 관리자 계정 가입 (가입 후 위 SQL로 ADMIN 승격 필요)
+POST {{host}}/users/signup
+Content-Type: application/json
+
+{ "email": "admin@email.com", "password": "admin1234", "nickname": "hq_admin" }
+
+### 31. 구매자 계정 가입
+POST {{host}}/users/signup
+Content-Type: application/json
+
+{ "email": "buyer@email.com", "password": "buyer1234", "nickname": "buyer_lee" }
+
+### 32. 판매자 로그인
+# @name sellerLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "min@email.com", "password": "abcd1234" }
+
+> {% client.global.set("sellerToken", response.body.data.accessToken); %}
+
+### 33. 구매자 로그인
+# @name buyerLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "buyer@email.com", "password": "buyer1234" }
+
+> {% client.global.set("buyerToken", response.body.data.accessToken); %}
+
+### 34. 관리자 로그인 (ADMIN 승격 후 실행)
+# @name adminLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@email.com", "password": "admin1234" }
+
+> {% client.global.set("adminToken", response.body.data.accessToken); %}
+
+### 35. [판매자] 상품 등록 → 입고 대기 건이 자동 생성됨
+# @name e2eProduct
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{
+  "categoryId": 1,
+  "title": "E2E 테스트용 코트",
+  "price": 120000,
+  "size": "L",
+  "color": "카멜",
+  "conditionGrade": "GOOD",
+  "images": ["https://picsum.photos/id/1025/600/800"]
+}
+
+> {% client.global.set("e2eProductId", response.body.data.productId); %}
+
+### 36. [관리자] 입고 대기 목록 → inboundId 확인
+# @name inboundList
+GET {{host}}/admin/inbounds?status=AWAITING
+Authorization: Bearer {{adminToken}}
+
+> {%
+    var list = response.body.data.content;
+    var mine = list.filter(i => i.productId === client.global.get("e2eProductId"));
+    if (mine.length > 0) client.global.set("inboundId", mine[0].inboundId);
+    client.log("inboundId = " + client.global.get("inboundId"));
+%}
+
+### 36-1. [일반유저] 관리자 API 접근 (403 COMMON_403 기대)
+GET {{host}}/admin/inbounds
+Authorization: Bearer {{buyerToken}}
+
+### 37. [관리자] 입고 확인 → 상품이 ON_SALE로 전환
+POST {{host}}/admin/inbounds/{{inboundId}}/confirm
+Authorization: Bearer {{adminToken}}
+
+### 38. 상품 목록에 노출되는지 확인 (이제 ON_SALE)
+GET {{host}}/products?keyword=E2E
+
+### 39. [판매자] 본인 상품 구매 시도 (403 ORDER_403_2 기대)
+POST {{host}}/orders
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "productId": {{e2eProductId}} }
+
+### 40. [구매자] 주문 생성 → order PAID, product PAID
+# @name createOrder
+POST {{host}}/orders
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{e2eProductId}} }
+
+> {% client.global.set("orderId", response.body.data.orderId); %}
+
+### 41. [구매자] 같은 상품 재주문 (409 ORDER_409_1 기대 — 이미 판매중 아님)
+POST {{host}}/orders
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{e2eProductId}} }
+
+### 42. [구매자] 모의 결제
+# @name pay
+POST {{host}}/payments
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "amount": 120000, "method": "MOCK" }
+
+> {% client.global.set("paymentId", response.body.data.paymentId); %}
+
+### 42-1. 금액 위조 결제 시도 (400 PAYMENT_400 기대)
+POST {{host}}/payments
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "amount": 1000, "method": "MOCK" }
+
+### 43. [관리자] 배송지 없이 출고 시도 (409 ORDER_409_6 기대)
+POST {{host}}/admin/orders/{{orderId}}/ship
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "trackingNo": "6234-1188-0092" }
+
+### 44. [구매자] 배송지 입력
+PATCH {{host}}/orders/{{orderId}}/shipping
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{
+  "receiverName": "이OO",
+  "receiverPhone": "010-0000-1234",
+  "zipcode": "04001",
+  "address1": "서울시 마포구 OO로 12",
+  "address2": "302호",
+  "memo": "부재 시 문 앞에 놓아주세요"
+}
+
+### 45. [구매자] 거래 확정 조기 시도 (409 ORDER_409_3 기대 — 아직 DELIVERED 아님)
+POST {{host}}/orders/{{orderId}}/confirm
+Authorization: Bearer {{buyerToken}}
+
+### 46. [관리자] 출고 처리 → order/product SHIPPED
+POST {{host}}/admin/orders/{{orderId}}/ship
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "trackingNo": "6234-1188-0092" }
+
+### 47. [구매자] 출고 후 취소 시도 (409 ORDER_409_2 기대)
+POST {{host}}/orders/{{orderId}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "reason": "단순 변심" }
+
+### 48. [관리자] 배송 완료 → order/product DELIVERED
+POST {{host}}/admin/orders/{{orderId}}/deliver
+Authorization: Bearer {{adminToken}}
+
+### 49. [남의 주문] 판매자가 구매자 주문 조회 (403 ORDER_403 기대)
+GET {{host}}/orders/{{orderId}}
+Authorization: Bearer {{sellerToken}}
+
+### 50. [구매자] 주문 상세 (타임라인 확인)
+GET {{host}}/orders/{{orderId}}
+Authorization: Bearer {{buyerToken}}
+
+### 51. [구매자] 거래 확정 → CONFIRMED, product SETTLED, 정산(PENDING) 생성
+# @name confirmOrder
+POST {{host}}/orders/{{orderId}}/confirm
+Authorization: Bearer {{buyerToken}}
+
+> {% client.global.set("settlementId", response.body.data.settlementId); %}
+
+### 52. [판매자] 내 정산 내역 — 120,000 → 수수료 12,000 → 실지급 108,000
+GET {{host}}/settlements/me?status=PENDING
+Authorization: Bearer {{sellerToken}}
+
+### 53. [구매자] 정산 조회 시도 (403 SETTLEMENT_403 기대)
+GET {{host}}/settlements/{{settlementId}}
+Authorization: Bearer {{buyerToken}}
+
+### 54. [관리자] 정산 완료 처리
+POST {{host}}/admin/settlements/{{settlementId}}/complete
+Authorization: Bearer {{adminToken}}
+
+### 55. [관리자] 정산 중복 완료 시도 (409 SETTLEMENT_409 기대)
+POST {{host}}/admin/settlements/{{settlementId}}/complete
+Authorization: Bearer {{adminToken}}
+
+### 56. [구매자] 내 구매 내역
+GET {{host}}/orders/me?status=CONFIRMED
+Authorization: Bearer {{buyerToken}}
+
+### 57. [구매자] 결제 상세
+GET {{host}}/payments/{{paymentId}}
+Authorization: Bearer {{buyerToken}}
+
+### 58. [판매자] 내 판매 내역 — SETTLED 확인
+GET {{host}}/products/me?status=SETTLED
+Authorization: Bearer {{sellerToken}}
