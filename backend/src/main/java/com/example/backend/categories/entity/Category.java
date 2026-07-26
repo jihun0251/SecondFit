@@ -9,7 +9,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "categories")
+@Table(
+        name = "categories",
+        // DDL: UNIQUE KEY uk_categories_name (name), KEY idx_categories_parent (parent_id)
+        uniqueConstraints = @UniqueConstraint(name = "uk_categories_name", columnNames = "name"),
+        indexes = @Index(name = "idx_categories_parent", columnList = "parent_id")
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Category {
@@ -30,6 +35,8 @@ public class Category {
     private Category parent;
 
     // 자식 방향: 나는 여러 자식을 가진다 ([데님 자켓, 코트])
+    // @OrderBy가 없으면 자식들의 순서가 DB 반환 순서에 맡겨져 화면 순서가 들쭉날쭉해진다
     @OneToMany(mappedBy = "parent")
+    @OrderBy("sortOrder ASC, id ASC")
     private List<Category> children = new ArrayList<>();
 }

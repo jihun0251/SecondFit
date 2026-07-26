@@ -1,91 +1,146 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-import { mockAiTagging, mockProfile } from "../mocks/data";
+import { categoryApi, productApi } from "../api";
+import { CONDITION_LABEL } from "../api/types";
+import type { AiTagging, ConditionGrade } from "../api/types";
+import { useAction, useAsync } from "../hooks/useAsync";
 import "./ProductCreatePage.css";
 
-const categories = ["아우터", "상의", "하의", "신발", "가방", "악세서리"];
 const sizes = ["S", "M", "L", "XL"];
-const grades = [
-  { label: "S (새상품급)", value: "NEW" },
-  { label: "A (사용감 적음)", value: "LIKE_NEW" },
-  { label: "B (사용감 있음)", value: "GOOD" },
-];
+
+const grades: ConditionGrade[] = ["NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"];
+
+/** 화면에서 다루는 이미지 1장 (아직 서버에 안 올라간 상태) */
+interface PickedImage {
+  file: File;
+  previewUrl: string;
+}
 
 function ProductCreatePage() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<PickedImage[]>([]);
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<number | null>(null);
   const [size, setSize] = useState("");
   const [color, setColor] = useState("");
-  const [grade, setGrade] = useState("");
+  const [grade, setGrade] = useState<ConditionGrade | "">("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
 
-  // AI 태깅 상태
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<typeof mockAiTagging | null>(null);
+  const [aiResult, setAiResult] = useState<AiTagging | null>(null);
 
-  // 이미지 추가 (실제 파일 대신 자리표시자)
-  const handleAddImage = () => {
-    if (images.length >= 8) {
+  const { data: categories } = useAsync(() => categoryApi.getTree(), []);
+  const { run, running } = useAction();
+
+  // 대분류를 고르면 그 아래 소분류를 보여준다
+  const [parentId, setParentId] = useState<number | null>(null);
+  const children = categories?.find((c) => c.id === parentId)?.children ?? [];
+
+  const handlePickFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(event.target.files ?? []);
+    if (picked.length === 0) return;
+
+    if (images.length + picked.length > 8) {
       alert("이미지는 최대 8장까지 등록할 수 있습니다.");
       return;
     }
-    const next = [...images, `img-${images.length + 1}`];
-    setImages(next);
 
-    // 첫 이미지가 올라오면 AI 태깅 자동 실행
-    if (next.length === 1) {
-      runAiTagging();
+    const next = picked.map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file), // 업로드 전 미리보기용
+    }));
+    const merged = [...images, ...next];
+    setImages(merged);
+
+    // 첫 이미지가 들어오면 대표 이미지로 AI 태깅을 돌린다
+    if (images.length === 0) {
+      void runAiTagging(next[0].file);
+    }
+
+    event.target.value = ""; // 같은 파일 다시 선택해도 onChange가 뜨도록
+  };
+
+  const runAiTagging = async (file: File) => {
+    setAiLoading(true);
+    setAiResult(null);
+    try {
+      // 추론 서버가 꺼져 있어도 available:false가 돌아올 뿐 실패하지 않는다
+      setAiResult(await productApi.aiTagging(file));
+    } catch {
+      setAiResult({ available: false, category: null, color: null, style: null, gender: null, confidence: null });
+    } finally {
+      setAiLoading(false);
     }
   };
 
-  // AI 자동 태깅 (2초 후 결과 반환하는 목업)
-  const runAiTagging = () => {
-    setAiLoading(true);
-    setAiResult(null);
-    setTimeout(() => {
-      // 실제로는 POST /products/ai-tagging 호출
-      setAiResult(mockAiTagging);
-      setAiLoading(false);
-    }, 2000);
-  };
-
-  // AI 제안값을 폼에 적용
+  /** AI 제안값을 폼에 채워 넣는다 (판매자가 고칠 수 있는 "제안"일 뿐) */
   const applyAi = () => {
-    if (!aiResult) return;
-    // "아우터 > 데님 자켓" → 대분류 "아우터"만 추출
-    const mainCat = aiResult.category.split(">")[0].trim();
-    setCategory(mainCat);
-    setColor(aiResult.color);
+    if (!aiResult?.available) return;
+
+    if (aiResult.color) setColor(aiResult.color);
+
+    // "아우터 > 데님 자켓" 형태를 실제 카테고리 ID로 맞춰본다
+    if (aiResult.category && categories) {
+      const [mainName, subName] = aiResult.category.split(">").map((s) => s.trim());
+      const parent = categories.find((c) => c.name === mainName);
+      if (parent) {
+        setParentId(parent.id);
+        const child = parent.children.find((c) => c.name === subName);
+        setCategoryId(child ? child.id : parent.id);
+      }
+    }
   };
 
-  const handleSubmit = () => {
+  const removeImage = (index: number) => {
+    URL.revokeObjectURL(images[index].previewUrl);
+    setImages(images.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
     if (images.length === 0) {
       alert("이미지를 최소 1장 등록해주세요.");
       return;
     }
-    if (!title || !category || !grade || !price) {
+    if (!title || !categoryId || !grade || !price) {
       alert("필수 항목(상품명, 카테고리, 상태 등급, 가격)을 입력해주세요.");
       return;
     }
-    // POST /products (백엔드 연동 지점)
-    console.log("상품 등록:", {
-      title, category, size, color, grade, price, description,
-      aiSuggestedCategory: aiResult?.category,
-      aiSuggestedColor: aiResult?.color,
-      aiConfidence: aiResult?.confidence,
+
+    await run(async () => {
+      // 1) 파일을 먼저 올려 URL을 확보한다 (등록 API가 URL 배열을 요구하므로)
+      const uploaded = await Promise.all(
+        images.map((image) => productApi.uploadImageFile(image.file))
+      );
+
+      // 2) 확보한 URL로 상품을 등록한다 → PENDING_INBOUND(입고 대기)로 생성됨
+      await productApi.create({
+        categoryId,
+        title,
+        description: description || undefined,
+        price: Number(price),
+        size: size || undefined,
+        color: color || undefined,
+        conditionGrade: grade,
+        images: uploaded.map((u) => u.url),
+        thumbnailIndex: 0,
+        // AI 원본 예측값도 함께 보관한다 (판매자가 값을 고쳐도 원본은 남는다)
+        aiSuggestedCategory: aiResult?.category ?? undefined,
+        aiSuggestedColor: aiResult?.color ?? undefined,
+        aiConfidence: aiResult?.confidence ?? undefined,
+      });
+
+      alert("상품이 등록되었습니다. 본사 입고 확인 후 판매가 시작됩니다.");
+      navigate("/my/sales");
     });
-    alert("상품이 등록되었습니다. (입고 대기 상태)");
-    navigate("/my/sales");
   };
 
   return (
     <div className="create-page">
-      <Header loggedIn userName={mockProfile.nickname} />
+      <Header />
       <div className="create-body">
         <h2 className="create-title">상품 등록</h2>
         <p className="create-desc">
@@ -99,41 +154,54 @@ function ProductCreatePage() {
               상품 이미지 <span className="required">*</span>
             </h4>
             <div className="image-grid">
-              {images.map((img, i) => (
-                <div className="image-box filled" key={img}>
-                  이미지 {i + 1}
+              {images.map((image, i) => (
+                <div
+                  className="image-box filled"
+                  key={image.previewUrl}
+                  style={{
+                    backgroundImage: `url(${image.previewUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                  onClick={() => removeImage(i)}
+                  title="클릭하면 제거됩니다"
+                >
                   {i === 0 && <span className="thumb-badge">대표</span>}
                 </div>
               ))}
               {images.length < 8 && (
-                <button className="image-box add" onClick={handleAddImage}>
+                <button className="image-box add" onClick={() => fileInputRef.current?.click()}>
                   + 추가
                 </button>
               )}
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: "none" }}
+              onChange={handlePickFiles}
+            />
 
             {/* AI 태깅 결과 패널 */}
             <div className="ai-panel">
               <div className="ai-panel-head">
                 <span className="ai-title">🤖 AI 자동 태깅</span>
-                {aiResult && (
+                {aiResult?.available && aiResult.confidence != null && (
                   <span className="ai-confidence">
                     신뢰도 {Math.round(aiResult.confidence * 100)}%
                   </span>
                 )}
               </div>
 
-              {aiLoading && (
-                <div className="ai-loading">이미지 분석 중...</div>
-              )}
+              {aiLoading && <div className="ai-loading">이미지 분석 중...</div>}
 
               {!aiLoading && !aiResult && (
-                <div className="ai-empty">
-                  이미지를 등록하면 자동으로 분석됩니다.
-                </div>
+                <div className="ai-empty">이미지를 등록하면 자동으로 분석됩니다.</div>
               )}
 
-              {!aiLoading && aiResult && aiResult.available && (
+              {!aiLoading && aiResult?.available && (
                 <>
                   <div className="ai-result">
                     <div className="ai-row">
@@ -161,7 +229,7 @@ function ProductCreatePage() {
 
               {!aiLoading && aiResult && !aiResult.available && (
                 <div className="ai-empty">
-                  분석에 실패했어요. 직접 입력해주세요.
+                  AI 서버에 연결하지 못했습니다. 직접 입력해주세요.
                 </div>
               )}
             </div>
@@ -181,16 +249,32 @@ function ProductCreatePage() {
             <div className="create-field">
               <label>카테고리 <span className="required">*</span></label>
               <div className="chip-row">
-                {categories.map((cat) => (
+                {(categories ?? []).map((cat) => (
                   <button
-                    key={cat}
-                    className={`form-chip ${category === cat ? "active" : ""}`}
-                    onClick={() => setCategory(cat)}
+                    key={cat.id}
+                    className={`form-chip ${parentId === cat.id ? "active" : ""}`}
+                    onClick={() => {
+                      setParentId(cat.id);
+                      setCategoryId(cat.id);
+                    }}
                   >
-                    {cat}
+                    {cat.name}
                   </button>
                 ))}
               </div>
+              {children.length > 0 && (
+                <div className="chip-row" style={{ marginTop: 8 }}>
+                  {children.map((child) => (
+                    <button
+                      key={child.id}
+                      className={`form-chip ${categoryId === child.id ? "active" : ""}`}
+                      onClick={() => setCategoryId(child.id)}
+                    >
+                      {child.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="create-field-row">
@@ -224,11 +308,11 @@ function ProductCreatePage() {
               <div className="chip-row">
                 {grades.map((g) => (
                   <button
-                    key={g.value}
-                    className={`form-chip ${grade === g.value ? "active" : ""}`}
-                    onClick={() => setGrade(g.value)}
+                    key={g}
+                    className={`form-chip ${grade === g ? "active" : ""}`}
+                    onClick={() => setGrade(g)}
                   >
-                    {g.label}
+                    {CONDITION_LABEL[g]}
                   </button>
                 ))}
               </div>
@@ -254,8 +338,8 @@ function ProductCreatePage() {
               />
             </div>
 
-            <button className="create-submit" onClick={handleSubmit}>
-              상품 등록
+            <button className="create-submit" onClick={handleSubmit} disabled={running}>
+              {running ? "등록 중..." : "상품 등록"}
             </button>
           </div>
         </div>

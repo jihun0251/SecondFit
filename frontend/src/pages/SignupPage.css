@@ -88,3 +88,13 @@ body {
   font-weight: 600;
   text-decoration: none;
 }
+/* 회원가입 실패 메시지 */
+.signup-error {
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fdeded;
+  color: #b3261e;
+  font-size: 13px;
+  line-height: 1.4;
+}

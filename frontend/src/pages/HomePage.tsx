@@ -1,16 +1,23 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-import { useLikes } from "../contexts/LikesContext";
-import { mockProducts } from "../mocks/data";
+import { categoryApi, productApi } from "../api";
+import { resolveImageUrl } from "../api/client";
+import { useAsync } from "../hooks/useAsync";
+import { useWishlist } from "../contexts/WishlistContext";
 import "./HomePage.css";
 
-const categories = ["전체", "아우터", "상의", "하의", "신발", "가방", "악세서리"];
-
 function HomePage() {
-  const { isLiked, toggleLike } = useLikes();
+  const navigate = useNavigate();
+  const { isWished, toggleWish } = useWishlist();
 
-  // 최신 5개만 노출
-  const latest = [...mockProducts].sort((a, b) => b.id - a.id).slice(0, 5);
+  // 최신 판매중 상품 5개
+  const { data: products, loading, error } = useAsync(
+    () => productApi.search({ sort: "latest", page: 0, pageSize: 5 }),
+    []
+  );
+
+  // 카테고리 칩 (대분류만)
+  const { data: categories } = useAsync(() => categoryApi.getTree(), []);
 
   return (
     <div className="home">
@@ -29,12 +36,16 @@ function HomePage() {
 
         {/* 카테고리 칩 */}
         <div className="category-chips">
-          {categories.map((cat, index) => (
+          <button className="category-chip active" onClick={() => navigate("/products")}>
+            전체
+          </button>
+          {(categories ?? []).map((cat) => (
             <button
-              key={cat}
-              className={`category-chip ${index === 0 ? "active" : ""}`}
+              key={cat.id}
+              className="category-chip"
+              onClick={() => navigate(`/products?categoryId=${cat.id}`)}
             >
-              {cat}
+              {cat.name}
             </button>
           ))}
         </div>
@@ -49,35 +60,54 @@ function HomePage() {
         </div>
 
         {/* 상품 그리드 */}
-        <div className="product-grid">
-          {latest.map((product) => (
-            <Link
-              to={`/products/${product.id}`}
-              className="product-card"
-              key={product.id}
-            >
-              <div className="product-thumb">
-                <span className="product-badge">● 판매중</span>
-                <button
-                  className={`product-like ${isLiked(product.id) ? "liked" : ""}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleLike(product.id);
-                  }}
+        {loading ? (
+          <div className="home-state">불러오는 중...</div>
+        ) : error ? (
+          <div className="home-state">{error}</div>
+        ) : (products?.content.length ?? 0) === 0 ? (
+          <div className="home-state">
+            아직 판매중인 상품이 없습니다. 관리자 입고 확인이 끝나면 여기에 표시됩니다.
+          </div>
+        ) : (
+          <div className="product-grid">
+            {products!.content.map((product) => (
+              <Link
+                to={`/products/${product.productId}`}
+                className="product-card"
+                key={product.productId}
+              >
+                <div
+                  className="product-thumb"
+                  style={
+                    product.thumbnail
+                      ? {
+                          backgroundImage: `url(${resolveImageUrl(product.thumbnail)})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }
+                      : undefined
+                  }
                 >
-                  {isLiked(product.id) ? "♥" : "♡"}
-                </button>
-              </div>
-              <div className="product-info">
-                <span className="product-name">{product.name}</span>
-                <span className="product-price">
-                  {product.price.toLocaleString()}원
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+                  <span className="product-badge">● 판매중</span>
+                  <button
+                    className={`product-like ${isWished(product.productId) ? "liked" : ""}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void toggleWish(product.productId);
+                    }}
+                  >
+                    {isWished(product.productId) ? "♥" : "♡"}
+                  </button>
+                </div>
+                <div className="product-info">
+                  <span className="product-name">{product.title}</span>
+                  <span className="product-price">{product.price.toLocaleString()}원</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

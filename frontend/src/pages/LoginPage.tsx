@@ -1,17 +1,46 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import { ApiError } from "../api/client";
+import { useAuth } from "../contexts/AuthContext";
 import "./LoginPage.css";
+
+interface LocationState {
+  from?: string;
+}
 
 function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+
+  // ProtectedRoute가 넘겨준 "원래 가려던 경로"
+  const from = (location.state as LocationState | null)?.from;
 
   const handleSubmit = async () => {
-    // 백엔드 로그인 API(JWT)는 아직 없음 → 목업으로 홈 이동
-    console.log("로그인 시도:", { email, password });
-    alert("로그인 성공! (목업)");
-    navigate("/");
+    if (!email || !password) {
+      setError("이메일과 비밀번호를 입력해 주세요.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const user = await login(email, password);
+
+      // 관리자는 관리자 화면으로, 일반 사용자는 원래 가려던 곳(없으면 홈)으로
+      if (from) navigate(from, { replace: true });
+      else if (user.role === "ADMIN") navigate("/admin/inbounds", { replace: true });
+      else navigate("/", { replace: true });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "로그인에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -27,6 +56,7 @@ function LoginPage() {
             placeholder="이메일을 입력하세요"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           />
         </div>
 
@@ -37,11 +67,14 @@ function LoginPage() {
             placeholder="비밀번호를 입력하세요"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           />
         </div>
 
-        <button className="login-button" onClick={handleSubmit}>
-          로그인
+        {error && <p className="login-error">{error}</p>}
+
+        <button className="login-button" onClick={handleSubmit} disabled={loading}>
+          {loading ? "로그인 중..." : "로그인"}
         </button>
 
         <div className="login-links">

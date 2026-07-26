@@ -1,5 +1,12 @@
-### 회원가입 성공 테스트
-POST http://localhost:8080/api/v1/users/signup
+### ============================================================
+### SecondFit API 테스트 (IntelliJ HTTP Client)
+### 위에서부터 순서대로 실행하면 토큰/상품ID가 자동으로 이어집니다.
+### ============================================================
+
+@host = http://localhost:8080/api/v1
+
+### 1. 회원가입
+POST {{host}}/users/signup
 Content-Type: application/json
 
 {
@@ -9,6 +16,615 @@ Content-Type: application/json
   "phone": "010-1234-5678"
 }
 
-### 카테고리 트리 조회
-GET http://localhost:8080/api/v1/categories
+### 2. 회원가입 - 이메일 중복 (409 EMAIL_DUPLICATED 기대)
+POST {{host}}/users/signup
+Content-Type: application/json
+
+{
+  "email": "min@email.com",
+  "password": "abcd1234",
+  "nickname": "another_nick",
+  "phone": "010-0000-0000"
+}
+
+### 3. 로그인 → accessToken 저장
+# @name login
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "min@email.com",
+  "password": "abcd1234"
+}
+
+> {%
+    client.global.set("accessToken", response.body.data.accessToken);
+    client.global.set("userId", response.body.data.user.userId);
+    client.log("accessToken 저장 완료");
+%}
+
+### 4. 로그인 실패 - 비밀번호 틀림 (401 LOGIN_FAILED 기대)
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "min@email.com",
+  "password": "wrongpassword1"
+}
+
+### 5. 카테고리 트리 조회 (인증 불필요)
+GET {{host}}/categories
 Accept: application/json
+
+### ============================================================
+### 인증 테스트
+### ============================================================
+
+### 6. 토큰 없이 상품 등록 (401 COMMON_401 기대)
+POST {{host}}/products
+Content-Type: application/json
+
+{
+  "categoryId": 1,
+  "title": "토큰 없는 요청",
+  "price": 10000,
+  "conditionGrade": "GOOD",
+  "images": ["https://example.com/1.jpg"]
+}
+
+### 7. 잘못된 토큰 (401 기대)
+GET {{host}}/products/me
+Authorization: Bearer this.is.not.a.valid.token
+
+### ============================================================
+### 상품 도메인
+### ============================================================
+
+### 8. 상품 등록 → productId 저장
+# @name createProduct
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "categoryId": 1,
+  "title": "빈티지 워싱 데님 트러커 자켓",
+  "description": "실측: 어깨 46 / 가슴 54 / 총장 66. 사용감 적은 A급.",
+  "price": 89000,
+  "size": "M",
+  "color": "인디고 블루",
+  "conditionGrade": "LIKE_NEW",
+  "images": [
+    "https://picsum.photos/id/1011/600/800",
+    "https://picsum.photos/id/1012/600/800"
+  ],
+  "thumbnailIndex": 0,
+  "aiSuggestedCategory": "아우터>데님 자켓",
+  "aiSuggestedColor": "인디고 블루",
+  "aiConfidence": 0.92
+}
+
+> {%
+    client.global.set("productId", response.body.data.productId);
+    client.log("productId = " + response.body.data.productId);
+%}
+
+### 9. 상품 등록 - 이미지 0장 (400 기대)
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "categoryId": 1,
+  "title": "이미지 없는 상품",
+  "price": 10000,
+  "conditionGrade": "GOOD",
+  "images": []
+}
+
+### 10. 상품 등록 - 없는 카테고리 (404 CATEGORY_404 기대)
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "categoryId": 999999,
+  "title": "없는 카테고리",
+  "price": 10000,
+  "conditionGrade": "GOOD",
+  "images": ["https://example.com/1.jpg"]
+}
+
+### 11. 상품 상세 조회 (인증 불필요, 조회수 +1)
+GET {{host}}/products/{{productId}}
+Accept: application/json
+
+### 12. 내 판매 내역 (인증 필요) — 페이지 크기 파라미터는 size
+GET {{host}}/products/me?page=0&size=20
+Authorization: Bearer {{accessToken}}
+
+### 12-1. 내 판매 내역 - 상태 필터
+GET {{host}}/products/me?status=PENDING_INBOUND&page=0&size=20
+Authorization: Bearer {{accessToken}}
+
+### 13. 상품 목록 조회 (ON_SALE만 노출 → 방금 등록한 건 PENDING_INBOUND라 안 보임)
+GET {{host}}/products?page=0&pageSize=20&sort=latest
+Accept: application/json
+
+### 14. 상품 목록 - 필터 조합
+GET {{host}}/products?categoryId=1&size=M&conditionGrade=LIKE_NEW&minPrice=10000&maxPrice=200000&sort=price_asc
+Accept: application/json
+
+### 15. 상품 목록 - 잘못된 enum 값 (400 기대)
+GET {{host}}/products?conditionGrade=BEST
+
+### 16. 상품 수정 (PENDING_INBOUND 상태라 성공)
+### 응답: { productId, price, status }
+PATCH {{host}}/products/{{productId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "price": 79000,
+  "description": "가격 인하했습니다."
+}
+
+### 17. 상품 이미지 업로드 (multipart, 1장씩)
+### Form 필드명은 file(단수), isThumbnail은 쿼리로 전달
+### ⚠️ backend 폴더에 sample.jpg를 두고 실행할 것
+### 응답 201: { imageId, url, isThumbnail }
+POST {{host}}/products/{{productId}}/images?isThumbnail=true
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sample.jpg"
+Content-Type: image/jpeg
+
+< ./sample.jpg
+--WebAppBoundary--
+
+### 17-1. 허용 안 되는 확장자 (400 FILE_400_2 기대)
+POST {{host}}/products/{{productId}}/images
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="evil.html"
+Content-Type: text/html
+
+<h1>hello</h1>
+--WebAppBoundary--
+
+### 18. 상품 이미지 삭제 (imageId는 11번 응답에서 확인) → 204 No Content
+DELETE {{host}}/products/{{productId}}/images/1
+Authorization: Bearer {{accessToken}}
+
+### 19. 남의 상품 수정 시도 (403 PRODUCT_403 기대)
+### 먼저 다른 계정으로 가입/로그인해서 그 토큰으로 실행할 것
+PATCH {{host}}/products/{{productId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "price": 1
+}
+
+### 20. 상품 삭제 → 204 No Content (본문 없음)
+DELETE {{host}}/products/{{productId}}
+Authorization: Bearer {{accessToken}}
+
+### 21. 삭제된 상품 조회 (404 PRODUCT_404 기대)
+GET {{host}}/products/{{productId}}
+
+### 22. 로그아웃
+POST {{host}}/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### ============================================================
+### 전체 거래 흐름 E2E
+### 등록 → 입고확인 → 판매중 → 결제 → 출고 → 배송 → 확정 → 정산
+###
+### ⚠️ 사전 준비: 관리자 계정이 필요합니다. 회원가입은 항상 USER로 생성되므로
+###    MySQL에서 직접 승격시키세요.
+###    UPDATE users SET role='ADMIN' WHERE email='admin@email.com';
+### ============================================================
+
+### 30. 관리자 계정 가입 (가입 후 위 SQL로 ADMIN 승격 필요)
+POST {{host}}/users/signup
+Content-Type: application/json
+
+{ "email": "admin@email.com", "password": "admin1234", "nickname": "hq_admin" }
+
+### 31. 구매자 계정 가입
+POST {{host}}/users/signup
+Content-Type: application/json
+
+{ "email": "buyer@email.com", "password": "buyer1234", "nickname": "buyer_lee" }
+
+### 32. 판매자 로그인
+# @name sellerLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "min@email.com", "password": "abcd1234" }
+
+> {% client.global.set("sellerToken", response.body.data.accessToken); %}
+
+### 33. 구매자 로그인
+# @name buyerLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "buyer@email.com", "password": "buyer1234" }
+
+> {% client.global.set("buyerToken", response.body.data.accessToken); %}
+
+### 34. 관리자 로그인 (ADMIN 승격 후 실행)
+# @name adminLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@email.com", "password": "admin1234" }
+
+> {% client.global.set("adminToken", response.body.data.accessToken); %}
+
+### 35. [판매자] 상품 등록 → 입고 대기 건이 자동 생성됨
+# @name e2eProduct
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{
+  "categoryId": 1,
+  "title": "E2E 테스트용 코트",
+  "price": 120000,
+  "size": "L",
+  "color": "카멜",
+  "conditionGrade": "GOOD",
+  "images": ["https://picsum.photos/id/1025/600/800"]
+}
+
+> {% client.global.set("e2eProductId", response.body.data.productId); %}
+
+### 36. [관리자] 입고 대기 목록 → inboundId 확인
+# @name inboundList
+GET {{host}}/admin/inbounds?status=AWAITING
+Authorization: Bearer {{adminToken}}
+
+> {%
+    var list = response.body.data.content;
+    var mine = list.filter(i => i.productId === client.global.get("e2eProductId"));
+    if (mine.length > 0) client.global.set("inboundId", mine[0].inboundId);
+    client.log("inboundId = " + client.global.get("inboundId"));
+%}
+
+### 36-1. [일반유저] 관리자 API 접근 (403 COMMON_403 기대)
+GET {{host}}/admin/inbounds
+Authorization: Bearer {{buyerToken}}
+
+### 37. [관리자] 입고 확인 → 상품이 ON_SALE로 전환
+POST {{host}}/admin/inbounds/{{inboundId}}/confirm
+Authorization: Bearer {{adminToken}}
+
+### 38. 상품 목록에 노출되는지 확인 (이제 ON_SALE)
+GET {{host}}/products?keyword=E2E
+
+### 39. [판매자] 본인 상품 구매 시도 (403 ORDER_403_2 기대)
+POST {{host}}/orders
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "productId": {{e2eProductId}} }
+
+### 40. [구매자] 주문 생성 → order PAID, product PAID
+# @name createOrder
+POST {{host}}/orders
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{e2eProductId}} }
+
+> {% client.global.set("orderId", response.body.data.orderId); %}
+
+### 41. [구매자] 같은 상품 재주문 (409 ORDER_409_1 기대 — 이미 판매중 아님)
+POST {{host}}/orders
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{e2eProductId}} }
+
+### 42. [구매자] 모의 결제
+# @name pay
+POST {{host}}/payments
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "amount": 120000, "method": "MOCK" }
+
+> {% client.global.set("paymentId", response.body.data.paymentId); %}
+
+### 42-1. 금액 위조 결제 시도 (400 PAYMENT_400 기대)
+POST {{host}}/payments
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "amount": 1000, "method": "MOCK" }
+
+### 43. [관리자] 배송지 없이 출고 시도 (409 ORDER_409_6 기대)
+POST {{host}}/admin/orders/{{orderId}}/ship
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "trackingNo": "6234-1188-0092" }
+
+### 44. [구매자] 배송지 입력
+PATCH {{host}}/orders/{{orderId}}/shipping
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{
+  "receiverName": "이OO",
+  "receiverPhone": "010-0000-1234",
+  "zipcode": "04001",
+  "address1": "서울시 마포구 OO로 12",
+  "address2": "302호",
+  "memo": "부재 시 문 앞에 놓아주세요"
+}
+
+### 45. [구매자] 거래 확정 조기 시도 (409 ORDER_409_3 기대 — 아직 DELIVERED 아님)
+POST {{host}}/orders/{{orderId}}/confirm
+Authorization: Bearer {{buyerToken}}
+
+### 46. [관리자] 출고 처리 → order/product SHIPPED
+POST {{host}}/admin/orders/{{orderId}}/ship
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "trackingNo": "6234-1188-0092" }
+
+### 47. [구매자] 출고 후 취소 시도 (409 ORDER_409_2 기대)
+POST {{host}}/orders/{{orderId}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "reason": "단순 변심" }
+
+### 48. [관리자] 배송 완료 → order/product DELIVERED
+POST {{host}}/admin/orders/{{orderId}}/deliver
+Authorization: Bearer {{adminToken}}
+
+### 49. [남의 주문] 판매자가 구매자 주문 조회 (403 ORDER_403 기대)
+GET {{host}}/orders/{{orderId}}
+Authorization: Bearer {{sellerToken}}
+
+### 50. [구매자] 주문 상세 (타임라인 확인)
+GET {{host}}/orders/{{orderId}}
+Authorization: Bearer {{buyerToken}}
+
+### 51. [구매자] 거래 확정 → CONFIRMED, product SETTLED, 정산(PENDING) 생성
+# @name confirmOrder
+POST {{host}}/orders/{{orderId}}/confirm
+Authorization: Bearer {{buyerToken}}
+
+> {% client.global.set("settlementId", response.body.data.settlementId); %}
+
+### 52. [판매자] 내 정산 내역 — 120,000 → 수수료 12,000 → 실지급 108,000
+GET {{host}}/settlements/me?status=PENDING
+Authorization: Bearer {{sellerToken}}
+
+### 53. [구매자] 정산 조회 시도 (403 SETTLEMENT_403 기대)
+GET {{host}}/settlements/{{settlementId}}
+Authorization: Bearer {{buyerToken}}
+
+### 54. [관리자] 정산 완료 처리
+POST {{host}}/admin/settlements/{{settlementId}}/complete
+Authorization: Bearer {{adminToken}}
+
+### 55. [관리자] 정산 중복 완료 시도 (409 SETTLEMENT_409 기대)
+POST {{host}}/admin/settlements/{{settlementId}}/complete
+Authorization: Bearer {{adminToken}}
+
+### 56. [구매자] 내 구매 내역
+GET {{host}}/orders/me?status=CONFIRMED
+Authorization: Bearer {{buyerToken}}
+
+### 57. [구매자] 결제 상세
+GET {{host}}/payments/{{paymentId}}
+Authorization: Bearer {{buyerToken}}
+
+### 58. [판매자] 내 판매 내역 — SETTLED 확인
+GET {{host}}/products/me?status=SETTLED
+Authorization: Bearer {{sellerToken}}
+
+### ============================================================
+### 회원 프로필 / 리뷰 / 찜 / 신고 / AI 태깅
+### 앞의 E2E(30~58)를 먼저 실행해서 거래가 확정된 상태여야 리뷰가 작성됩니다.
+### ============================================================
+
+### 60. 내 프로필 조회 (전화번호 마스킹 확인)
+GET {{host}}/users/me
+Authorization: Bearer {{sellerToken}}
+
+### 61. 내 프로필 수정 (정산계좌 등록)
+PATCH {{host}}/users/me
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "phone": "010-9999-8888", "settlementAccount": "카카오뱅크 3333-01-1234567" }
+
+### 61-1. 닉네임 중복 수정 시도 (409 USER_409_2 기대)
+PATCH {{host}}/users/me
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "nickname": "buyer_lee" }
+
+### 62. 공개 프로필 조회 (인증 불필요, 판매중 상품 + 평점)
+GET {{host}}/users/{{userId}}
+
+### ---------- 리뷰 ----------
+
+### 63. [구매자] 리뷰 작성 — 거래 확정된 주문에만 가능
+# @name createReview
+POST {{host}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "rating": 5, "content": "상태 설명 그대로예요. 좋은 거래 감사합니다." }
+
+> {% client.global.set("reviewId", response.body.data.reviewId); %}
+
+### 63-1. 같은 주문에 리뷰 재작성 (409 REVIEW_409_1 기대)
+POST {{host}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "rating": 3 }
+
+### 63-2. 평점 범위 초과 (400 기대)
+POST {{host}}/reviews
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "orderId": {{orderId}}, "rating": 6 }
+
+### 64. 판매자 리뷰 목록 (인증 불필요, averageRating 포함)
+GET {{host}}/users/{{userId}}/reviews?page=0&size=20
+
+### 65. [판매자] 남의 리뷰 삭제 시도 (403 REVIEW_403 기대)
+DELETE {{host}}/reviews/{{reviewId}}
+Authorization: Bearer {{sellerToken}}
+
+### ---------- 찜 ----------
+
+### 66. [판매자] 상품 등록 (찜/신고 테스트용)
+# @name wishTarget
+POST {{host}}/products
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{
+  "categoryId": 1,
+  "title": "찜 테스트용 니트",
+  "price": 50000,
+  "conditionGrade": "GOOD",
+  "images": ["https://picsum.photos/id/1035/600/800"]
+}
+
+> {% client.global.set("wishProductId", response.body.data.productId); %}
+
+### 67. [구매자] 찜 추가
+POST {{host}}/wishlists
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{wishProductId}} }
+
+### 67-1. 중복 찜 (409 WISHLIST_409 기대)
+POST {{host}}/wishlists
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{wishProductId}} }
+
+### 68. [판매자] 가격 인하 (찜 목록의 priceChange 확인용)
+PATCH {{host}}/products/{{wishProductId}}
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "price": 44000 }
+
+### 69. [구매자] 찜 목록 — priceChange가 -6000으로 나와야 함
+GET {{host}}/wishlists
+Authorization: Bearer {{buyerToken}}
+
+### 70. [구매자] 찜 취소 (경로 변수는 productId) → 204
+DELETE {{host}}/wishlists/{{wishProductId}}
+Authorization: Bearer {{buyerToken}}
+
+### 70-1. 찜 안 한 상품 취소 (404 WISHLIST_404 기대)
+DELETE {{host}}/wishlists/{{wishProductId}}
+Authorization: Bearer {{buyerToken}}
+
+### ---------- 신고 ----------
+
+### 71. [판매자] 본인 상품 신고 시도 (403 REPORT_403 기대)
+POST {{host}}/reports
+Content-Type: application/json
+Authorization: Bearer {{sellerToken}}
+
+{ "productId": {{wishProductId}}, "reason": "FAKE", "detail": "본인 상품" }
+
+### 72. [구매자] 신고 접수
+# @name createReport
+POST {{host}}/reports
+Content-Type: application/json
+Authorization: Bearer {{buyerToken}}
+
+{ "productId": {{wishProductId}}, "reason": "FAKE", "detail": "명품 정품 허위 기재 의심" }
+
+> {% client.global.set("reportId", response.body.data.reportId); %}
+
+### 73. [관리자] 신고 목록 (count = 같은 상품 누적 신고 수)
+GET {{host}}/admin/reports?status=RECEIVED
+Authorization: Bearer {{adminToken}}
+
+### 74. [관리자] 신고 처리 + 상품 노출 중지
+PATCH {{host}}/admin/reports/{{reportId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "RESOLVED", "action": "SUSPEND_PRODUCT" }
+
+### 74-1. 이미 처리된 신고 재처리 (409 REPORT_409 기대)
+PATCH {{host}}/admin/reports/{{reportId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "status": "REJECTED" }
+
+### 75. 노출 중지된 상품이 목록에서 사라졌는지 확인
+GET {{host}}/products?keyword=찜 테스트용
+
+### ---------- 카테고리별 상품 / AI 태깅 ----------
+
+### 76. 카테고리별 판매중 상품 (인증 불필요)
+GET {{host}}/categories/1/products?sort=latest&page=0&size=20
+
+### 76-1. 없는 카테고리 (404 CATEGORY_404 기대)
+GET {{host}}/categories/999999/products
+
+### 77. AI 자동 태깅
+### ⚠️ ai-server가 꺼져 있어도 200 + available=false로 응답해야 정상입니다.
+###    켜려면: cd ai-server && uvicorn main:app --port 8000
+POST {{host}}/products/ai-tagging
+Authorization: Bearer {{sellerToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="image"; filename="sample.jpg"
+Content-Type: image/jpeg
+
+< ./sample.jpg
+--WebAppBoundary--
+
+### 78. AI 태깅 - 토큰 없이 (401 기대)
+POST {{host}}/products/ai-tagging
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="image"; filename="sample.jpg"
+Content-Type: image/jpeg
+
+< ./sample.jpg
+--WebAppBoundary--
+
+### 79. [판매자] 찜/신고가 달린 상품 삭제 → 204 (FK 충돌 없이 지워져야 함)
+DELETE {{host}}/products/{{wishProductId}}
+Authorization: Bearer {{sellerToken}}
+
+### 80. 회원 탈퇴 → 204 (status=WITHDRAWN, 레코드는 남음)
+### ⚠️ 실행하면 해당 계정으로 재로그인이 막힙니다. 마지막에 실행하세요.
+# DELETE {{host}}/users/me
+# Authorization: Bearer {{buyerToken}}

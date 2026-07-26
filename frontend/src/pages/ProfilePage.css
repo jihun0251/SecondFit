@@ -160,3 +160,9 @@
 .btn-save:hover {
   background-color: #374151;
 }
+/* 입력 필드 아래 보조 설명 */
+.profile-hint {
+  margin-top: 6px;
+  color: #999;
+  font-size: 12px;
+}

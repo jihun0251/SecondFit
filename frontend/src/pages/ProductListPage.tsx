@@ -1,57 +1,68 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import Header from "../components/Header";
-import { useLikes } from "../contexts/LikesContext";
-import { mockProducts } from "../mocks/data";
+import { categoryApi, productApi } from "../api";
+import { resolveImageUrl } from "../api/client";
+import { CONDITION_LABEL } from "../api/types";
+import type { ConditionGrade } from "../api/types";
+import { useAsync } from "../hooks/useAsync";
+import { useWishlist } from "../contexts/WishlistContext";
 import "./ProductListPage.css";
 
-const categories = ["아우터", "상의", "하의", "신발", "가방"];
 const sizes = ["S", "M", "L", "XL"];
-const gradeOptions = [
-  { label: "S (새상품급)", value: "S급" },
-  { label: "A (사용감 적음)", value: "A급" },
-  { label: "B (사용감 있음)", value: "B급" },
+
+const gradeOptions: { label: string; value: ConditionGrade }[] = [
+  { label: "새상품", value: "NEW" },
+  { label: "S (사용감 거의 없음)", value: "LIKE_NEW" },
+  { label: "A (사용감 적음)", value: "GOOD" },
+  { label: "B (사용감 있음)", value: "FAIR" },
 ];
 
 function ProductListPage() {
-  const [selectedCats, setSelectedCats] = useState<string[]>(["아우터"]);
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
-  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  // 헤더 검색과 홈 카테고리 칩이 쿼리스트링으로 넘겨준다
+  const [searchParams] = useSearchParams();
+
+  const [categoryId, setCategoryId] = useState<number | undefined>();
+  const [selectedSize, setSelectedSize] = useState<string | undefined>();
+  const [selectedGrade, setSelectedGrade] = useState<ConditionGrade | undefined>();
   const [maxPrice, setMaxPrice] = useState("");
-  const [sort, setSort] = useState<"latest" | "price">("latest");
+  const [sort, setSort] = useState<"latest" | "price_asc">("latest");
+  const [keyword, setKeyword] = useState("");
 
-  const { isLiked, toggleLike } = useLikes();
+  // URL이 바뀌면 필터에 반영
+  useEffect(() => {
+    const urlKeyword = searchParams.get("keyword") ?? "";
+    const urlCategory = searchParams.get("categoryId");
+    setKeyword(urlKeyword);
+    setCategoryId(urlCategory ? Number(urlCategory) : undefined);
+  }, [searchParams]);
 
-  const toggle = (
-    list: string[],
-    value: string,
-    setter: (v: string[]) => void
-  ) => {
-    setter(
-      list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
-    );
-  };
+  const { data: categories } = useAsync(() => categoryApi.getTree(), []);
 
-  // 필터링
-  let filtered = mockProducts.filter((p) => {
-    if (selectedCats.length > 0 && !selectedCats.includes(p.category)) return false;
-    if (selectedSizes.length > 0 && !selectedSizes.includes(p.size)) return false;
-    if (selectedGrades.length > 0 && !selectedGrades.includes(p.grade)) return false;
-    if (maxPrice && p.price > Number(maxPrice)) return false;
-    return true;
-  });
-
-  // 정렬
-  filtered = [...filtered].sort((a, b) =>
-    sort === "price" ? a.price - b.price : b.id - a.id
+  /**
+   * 필터가 바뀔 때마다 서버에 다시 물어본다.
+   * 예전에는 목업 배열을 브라우저에서 걸렀지만, 실제로는 상품이 수천 건일 수 있어서
+   * 전부 받아와 거르는 방식은 쓸 수 없다.
+   */
+  const { data, loading, error } = useAsync(
+    () =>
+      productApi.search({
+        keyword: keyword || undefined,
+        categoryId,
+        size: selectedSize,
+        conditionGrade: selectedGrade,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        sort,
+        page: 0,
+        pageSize: 40,
+      }),
+    [keyword, categoryId, selectedSize, selectedGrade, maxPrice, sort]
   );
 
-  const titleText =
-    selectedCats.length === 0
-      ? "전체"
-      : selectedCats.length === 1
-      ? selectedCats[0]
-      : `${selectedCats[0]} 외 ${selectedCats.length - 1}개`;
+  const { isWished, toggleWish } = useWishlist();
+
+  const products = data?.content ?? [];
+  const selectedCategoryName = categories?.find((c) => c.id === categoryId)?.name;
 
   return (
     <div className="product-list-page">
@@ -61,14 +72,24 @@ function ProductListPage() {
         <aside className="filter-sidebar">
           <div className="filter-group">
             <h4 className="filter-title">카테고리</h4>
-            {categories.map((cat) => (
-              <label className="filter-check" key={cat}>
+            <label className="filter-check">
+              <input
+                type="radio"
+                name="category"
+                checked={categoryId === undefined}
+                onChange={() => setCategoryId(undefined)}
+              />
+              전체
+            </label>
+            {(categories ?? []).map((cat) => (
+              <label className="filter-check" key={cat.id}>
                 <input
-                  type="checkbox"
-                  checked={selectedCats.includes(cat)}
-                  onChange={() => toggle(selectedCats, cat, setSelectedCats)}
+                  type="radio"
+                  name="category"
+                  checked={categoryId === cat.id}
+                  onChange={() => setCategoryId(cat.id)}
                 />
-                {cat}
+                {cat.name}
               </label>
             ))}
           </div>
@@ -81,10 +102,8 @@ function ProductListPage() {
               {sizes.map((size) => (
                 <button
                   key={size}
-                  className={`size-chip ${
-                    selectedSizes.includes(size) ? "active" : ""
-                  }`}
-                  onClick={() => toggle(selectedSizes, size, setSelectedSizes)}
+                  className={`size-chip ${selectedSize === size ? "active" : ""}`}
+                  onClick={() => setSelectedSize(selectedSize === size ? undefined : size)}
                 >
                   {size}
                 </button>
@@ -108,14 +127,22 @@ function ProductListPage() {
 
           <div className="filter-group">
             <h4 className="filter-title">상태 등급</h4>
+            <label className="filter-check">
+              <input
+                type="radio"
+                name="grade"
+                checked={selectedGrade === undefined}
+                onChange={() => setSelectedGrade(undefined)}
+              />
+              전체
+            </label>
             {gradeOptions.map((g) => (
               <label className="filter-check" key={g.value}>
                 <input
-                  type="checkbox"
-                  checked={selectedGrades.includes(g.value)}
-                  onChange={() =>
-                    toggle(selectedGrades, g.value, setSelectedGrades)
-                  }
+                  type="radio"
+                  name="grade"
+                  checked={selectedGrade === g.value}
+                  onChange={() => setSelectedGrade(g.value)}
                 />
                 {g.label}
               </label>
@@ -127,8 +154,8 @@ function ProductListPage() {
         <main className="list-main">
           <div className="list-header">
             <h2 className="list-title">
-              {titleText}
-              <span className="list-count">· 판매중 {filtered.length}건</span>
+              {keyword ? `"${keyword}" 검색 결과` : selectedCategoryName ?? "전체"}
+              <span className="list-count">· 판매중 {data?.totalElements ?? 0}건</span>
             </h2>
             <div className="sort-buttons">
               <button
@@ -138,42 +165,55 @@ function ProductListPage() {
                 최신순
               </button>
               <button
-                className={`sort-btn ${sort === "price" ? "active" : ""}`}
-                onClick={() => setSort("price")}
+                className={`sort-btn ${sort === "price_asc" ? "active" : ""}`}
+                onClick={() => setSort("price_asc")}
               >
                 낮은 가격순
               </button>
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="list-empty">불러오는 중...</div>
+          ) : error ? (
+            <div className="list-empty">{error}</div>
+          ) : products.length === 0 ? (
             <div className="list-empty">조건에 맞는 상품이 없습니다.</div>
           ) : (
             <div className="list-grid">
-              {filtered.map((p) => (
-                <Link to={`/products/${p.id}`} className="list-card" key={p.id}>
-                  <div className="list-thumb">
+              {products.map((p) => (
+                <Link to={`/products/${p.productId}`} className="list-card" key={p.productId}>
+                  <div
+                    className="list-thumb"
+                    style={
+                      p.thumbnail
+                        ? {
+                            backgroundImage: `url(${resolveImageUrl(p.thumbnail)})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }
+                        : undefined
+                    }
+                  >
                     <span className="badge-onsale">● 판매중</span>
                     <button
-                      className={`like-btn ${isLiked(p.id) ? "liked" : ""}`}
+                      className={`like-btn ${isWished(p.productId) ? "liked" : ""}`}
                       onClick={(e) => {
-                        e.preventDefault();   // 카드 링크 이동 막기
+                        e.preventDefault(); // 카드 링크 이동 막기
                         e.stopPropagation();
-                        toggleLike(p.id);
+                        void toggleWish(p.productId);
                       }}
                     >
-                      {isLiked(p.id) ? "♥" : "♡"}
+                      {isWished(p.productId) ? "♥" : "♡"}
                     </button>
                   </div>
                   <div className="list-info">
-                    <span className="list-name">{p.name}</span>
+                    <span className="list-name">{p.title}</span>
                     <div className="list-tags">
-                      <span className="tag">{p.size}</span>
-                      <span className="tag">{p.grade}</span>
+                      {p.size && <span className="tag">{p.size}</span>}
+                      <span className="tag">{CONDITION_LABEL[p.conditionGrade]}</span>
                     </div>
-                    <span className="list-price">
-                      {p.price.toLocaleString()}원
-                    </span>
+                    <span className="list-price">{p.price.toLocaleString()}원</span>
                   </div>
                 </Link>
               ))}
